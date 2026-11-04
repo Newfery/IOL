@@ -1,104 +1,125 @@
--- 1. Catálogo de Tarifas (HU4)
-CREATE TABLE tarifas (
+-- 1. Tabla Inversor
+CREATE TABLE inversor (
     id SERIAL PRIMARY KEY,
-    categoria VARCHAR(20) NOT NULL UNIQUE CHECK (categoria IN ('economico', 'confort', 'premium')),
-    precio_base NUMERIC(10, 2) NOT NULL CHECK (precio_base > 0),
-    precio_por_km NUMERIC(10, 2) NOT NULL CHECK (precio_por_km > 0)
+    email VARCHAR(255) UNIQUE NOT NULL,
+    nombre VARCHAR(255) NOT NULL,
+    cuit VARCHAR(11) UNIQUE NOT NULL,
+    perfil_riesgo VARCHAR(20) NOT NULL,
+    fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- HU1: El CUIT debe tener exactamente 11 dígitos numéricos
+    CONSTRAINT chk_cuit_length CHECK (cuit ~ '^[0-9]{11}$'),
+    -- HU1: Perfiles válidos
+    CONSTRAINT chk_perfil_riesgo CHECK (perfil_riesgo IN ('conservador', 'moderado', 'agresivo'))
 );
 
--- 2. Pasajeros (HU1)
-CREATE TABLE pasajeros (
+-- 2. Tabla Cuenta
+CREATE TABLE cuenta (
     id SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
-    email VARCHAR(150) NOT NULL UNIQUE,
-    telefono VARCHAR(20) NOT NULL
+    inversor_id INT UNIQUE NOT NULL, -- UNIQUE porque es 1 a 1
+    numero_comitente VARCHAR(50) UNIQUE NOT NULL,
+    saldo_ars DECIMAL(15, 2) DEFAULT 0.00 NOT NULL,
+    saldo_usd DECIMAL(15, 2) DEFAULT 0.00 NOT NULL,
+    
+    CONSTRAINT fk_cuenta_inversor FOREIGN KEY (inversor_id) REFERENCES inversor(id) ON DELETE CASCADE,
+    -- HU3 y HU4: El saldo no puede ser negativo (se restringe extracción mayor al saldo)
+    CONSTRAINT chk_saldo_ars CHECK (saldo_ars >= 0),
+    CONSTRAINT chk_saldo_usd CHECK (saldo_usd >= 0)
 );
 
--- 3. Conductores (HU1)
-CREATE TABLE conductores (
+-- 3. Tabla Activo
+CREATE TABLE activo (
     id SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
-    licencia VARCHAR(50) NOT NULL UNIQUE,
-    calificacion_promedio NUMERIC(3, 2) DEFAULT 0 CHECK (calificacion_promedio >= 0 AND calificacion_promedio <= 5),
-    disponible BOOLEAN DEFAULT TRUE
+    ticker VARCHAR(10) UNIQUE NOT NULL,
+    nombre VARCHAR(255) NOT NULL,
+    tipo VARCHAR(20) NOT NULL,
+    moneda VARCHAR(3) NOT NULL,
+    precio_actual DECIMAL(15, 4) NOT NULL,
+    nivel_riesgo INT NOT NULL,
+    activo BOOLEAN DEFAULT TRUE NOT NULL,
+    
+    -- HU2: Tipos y monedas válidas
+    CONSTRAINT chk_activo_tipo CHECK (tipo IN ('accion', 'cedear', 'bono')),
+    CONSTRAINT chk_activo_moneda CHECK (moneda IN ('ARS', 'USD')),
+    -- HU2: Precio mayor a 0 y riesgo de 1 a 5
+    CONSTRAINT chk_precio_actual CHECK (precio_actual > 0),
+    CONSTRAINT chk_nivel_riesgo CHECK (nivel_riesgo BETWEEN 1 AND 5)
 );
 
--- 4. Vehículos (HU2)
-CREATE TABLE vehiculos (
+-- 4. Tabla Operacion
+CREATE TABLE operacion (
     id SERIAL PRIMARY KEY,
-    conductor_id INTEGER NOT NULL REFERENCES conductores(id),
-    patente VARCHAR(20) NOT NULL UNIQUE,
-    modelo VARCHAR(50) NOT NULL,
-    anio INTEGER NOT NULL,
-    categoria VARCHAR(20) NOT NULL CHECK (categoria IN ('economico', 'confort', 'premium'))
+    cuenta_id INT NOT NULL,
+    activo_id INT NOT NULL,
+    tipo VARCHAR(20) NOT NULL,
+    cantidad DECIMAL(18, 4) NOT NULL,
+    precio_unitario DECIMAL(15, 4) NOT NULL,
+    comision DECIMAL(15, 2) NOT NULL,
+    total DECIMAL(15, 2) NOT NULL,
+    resultado_realizado DECIMAL(15, 2), -- HU6: Para guardar ganancia/pérdida en ventas
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    estado VARCHAR(20) NOT NULL,
+    
+    CONSTRAINT fk_operacion_cuenta FOREIGN KEY (cuenta_id) REFERENCES cuenta(id),
+    CONSTRAINT fk_operacion_activo FOREIGN KEY (activo_id) REFERENCES activo(id),
+    
+    CONSTRAINT chk_operacion_tipo CHECK (tipo IN ('compra', 'venta')),
+    CONSTRAINT chk_operacion_cantidad CHECK (cantidad > 0),
+    CONSTRAINT chk_operacion_precio CHECK (precio_unitario > 0),
+    CONSTRAINT chk_operacion_comision CHECK (comision >= 0),
+    CONSTRAINT chk_operacion_estado CHECK (estado IN ('pendiente', 'ejecutada', 'rechazada'))
 );
 
--- 5. Métodos de Pago (HU3)
-CREATE TABLE metodos_pago (
+-- 5. Tabla Movimiento (Depósitos, extracciones, dividendos)
+CREATE TABLE movimiento (
     id SERIAL PRIMARY KEY,
-    pasajero_id INTEGER NOT NULL REFERENCES pasajeros(id),
-    tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('tarjeta_credito', 'tarjeta_debito', 'efectivo', 'billetera_virtual')),
-    ultimos_digitos CHAR(4) -- Solo para tarjetas, puede ser NULL en efectivo
+    cuenta_id INT NOT NULL,
+    tipo VARCHAR(20) NOT NULL,
+    moneda VARCHAR(3) NOT NULL,
+    monto DECIMAL(15, 2) NOT NULL,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    descripcion TEXT,
+    
+    CONSTRAINT fk_movimiento_cuenta FOREIGN KEY (cuenta_id) REFERENCES cuenta(id),
+    
+    -- HU3: Movimientos son positivos. Las extracciones descuentan mediante lógica, pero el registro del monto absoluto es > 0.
+    CONSTRAINT chk_movimiento_monto CHECK (monto > 0),
+    CONSTRAINT chk_movimiento_tipo CHECK (tipo IN ('deposito', 'extraccion', 'dividendo')),
+    CONSTRAINT chk_movimiento_moneda CHECK (moneda IN ('ARS', 'USD'))
 );
 
--- 6. Cupones (HU13)
-CREATE TABLE cupones (
+-- 6. Tabla Dividendo
+CREATE TABLE dividendo (
     id SERIAL PRIMARY KEY,
-    codigo VARCHAR(20) NOT NULL UNIQUE,
-    porcentaje_descuento INTEGER NOT NULL CHECK (porcentaje_descuento BETWEEN 1 AND 100),
-    fecha_vencimiento DATE NOT NULL
+    activo_id INT NOT NULL,
+    monto_por_unidad DECIMAL(15, 4) NOT NULL,
+    fecha_pago TIMESTAMP NOT NULL,
+    
+    CONSTRAINT fk_dividendo_activo FOREIGN KEY (activo_id) REFERENCES activo(id),
+    CONSTRAINT chk_dividendo_monto CHECK (monto_por_unidad > 0)
 );
 
--- 7. Multiplicador Horario (HU11)
-CREATE TABLE multiplicadores_horario (
-    id SERIAL PRIMARY KEY,
-    dia_semana INTEGER NOT NULL CHECK (dia_semana BETWEEN 0 AND 6), -- 0=Domingo, 6=Sábado
-    hora_desde TIME NOT NULL,
-    hora_hasta TIME NOT NULL,
-    factor NUMERIC(3, 2) NOT NULL CHECK (factor > 1),
-    CONSTRAINT check_horario_valido CHECK (hora_desde < hora_hasta)
+-- 7. Tabla Intermedia: Tenencias (Cuenta - Activo)
+CREATE TABLE tenencia (
+    cuenta_id INT NOT NULL,
+    activo_id INT NOT NULL,
+    cantidad DECIMAL(18, 4) NOT NULL,
+    precio_promedio DECIMAL(15, 4) NOT NULL,
+    
+    PRIMARY KEY (cuenta_id, activo_id),
+    CONSTRAINT fk_tenencia_cuenta FOREIGN KEY (cuenta_id) REFERENCES cuenta(id) ON DELETE CASCADE,
+    CONSTRAINT fk_tenencia_activo FOREIGN KEY (activo_id) REFERENCES activo(id),
+    
+    CONSTRAINT chk_tenencia_cantidad CHECK (cantidad >= 0),
+    CONSTRAINT chk_tenencia_precio CHECK (precio_promedio >= 0)
 );
 
--- 8. Viajes (HU5, HU6, HU7, HU11, HU13)
-CREATE TABLE viajes (
-    id SERIAL PRIMARY KEY,
-    pasajero_id INTEGER NOT NULL REFERENCES pasajeros(id),
-    conductor_id INTEGER REFERENCES conductores(id), -- NULL inicialmente (HU5)
-    vehiculo_id INTEGER REFERENCES vehiculos(id),
-    metodo_pago_id INTEGER NOT NULL REFERENCES metodos_pago(id),
-    cupon_id INTEGER REFERENCES cupones(id),
-    origen TEXT NOT NULL,
-    destino TEXT NOT NULL,
-    distancia_km NUMERIC(10, 2) NOT NULL CHECK (distancia_km > 0),
-    fecha_solicitud TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    fecha_inicio TIMESTAMP,
-    fecha_fin TIMESTAMP,
-    estado VARCHAR(20) DEFAULT 'pendiente' 
-        CHECK (estado IN ('pendiente', 'asignado', 'en_curso', 'finalizado', 'cancelado', 'sin_conductor')),
-    tarifa_final NUMERIC(10, 2) NOT NULL, -- Se guarda el cálculo final (HU5)
-    multiplicador_aplicado NUMERIC(3, 2) DEFAULT 1.0
-);
-
--- 9. Calificaciones (HU8)
-CREATE TABLE calificaciones (
-    id SERIAL PRIMARY KEY,
-    viaje_id INTEGER NOT NULL UNIQUE REFERENCES viajes(id),
-    puntaje_pasajero INTEGER CHECK (puntaje_pasajero BETWEEN 1 AND 5),
-    puntaje_conductor INTEGER CHECK (puntaje_conductor BETWEEN 1 AND 5),
-    comentario TEXT
-);
-
--- 10. Cargos / Penalidades (HU12)
-CREATE TABLE cargos (
-    id SERIAL PRIMARY KEY,
-    viaje_id INTEGER NOT NULL REFERENCES viajes(id),
-    monto NUMERIC(10, 2) NOT NULL,
-    motivo VARCHAR(100) DEFAULT 'Penalidad por cancelación tardía'
-);
-
--- 11. Tabla pivote para uso de cupones (HU13 - Para que no se repita por pasajero)
-CREATE TABLE cupones_usados (
-    pasajero_id INTEGER REFERENCES pasajeros(id),
-    cupon_id INTEGER REFERENCES cupones(id),
-    PRIMARY KEY (pasajero_id, cupon_id)
+-- 8. Tabla Intermedia: Favoritos (Inversor - Activo)
+CREATE TABLE favorito (
+    inversor_id INT NOT NULL,
+    activo_id INT NOT NULL,
+    
+    PRIMARY KEY (inversor_id, activo_id),
+    CONSTRAINT fk_favorito_inversor FOREIGN KEY (inversor_id) REFERENCES inversor(id) ON DELETE CASCADE,
+    CONSTRAINT fk_favorito_activo FOREIGN KEY (activo_id) REFERENCES activo(id) ON DELETE CASCADE
 );
