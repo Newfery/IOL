@@ -22,6 +22,9 @@ class InversorRepository:
     def get_by_id(self, inversor_id: int) -> Inversor | None:
         return self.db.query(Inversor).filter(Inversor.id == inversor_id).first()
 
+    def get_by_email(self, email: str) -> Inversor | None:
+        return self.db.query(Inversor).filter(Inversor.email == email).first()
+
     def update(self, inversor: Inversor) -> Inversor:
         self.db.add(inversor)
         self.db.commit()

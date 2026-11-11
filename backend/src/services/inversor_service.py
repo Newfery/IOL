@@ -24,6 +24,12 @@ class InversorService:
             return None
         return to_inversor_response(inversor)
 
+    def get_by_email(self, email: str) -> InversorResponseDTO | None:
+        inversor = self.repo.get_by_email(email)
+        if inversor is None:
+            return None
+        return to_inversor_response(inversor)
+
     def update(self, inversor_id: int, dto: UpdateInversorDTO) -> InversorResponseDTO | None:
         inversor = self.repo.get_by_id(inversor_id)
         if inversor is None:
