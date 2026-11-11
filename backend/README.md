@@ -25,7 +25,9 @@ Estructura base de un proyecto en capas (routers, services, repositories, models
 ## Setup
 
 ```bash
+cd. \backend\
 python -m venv venv
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 source venv/bin/activate          # Linux/Mac
 # venv\Scripts\Activate.ps1       # Windows
 
