@@ -1,12 +1,12 @@
-from sqlalchemy import Column, Integer, String, Date, CheckConstraint
-from sqlalchemy.orm import declarative_base
 from datetime import date
 
-Base = declarative_base()
+from sqlalchemy import CheckConstraint, Column, Date, Integer, String
+
+from src.db.connection import Base
 
 
 class Inversor(Base):
-    __tablename__ = "inversores"
+    __tablename__ = "inversor"
 
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, nullable=False)

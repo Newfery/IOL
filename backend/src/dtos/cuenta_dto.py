@@ -1,26 +1,20 @@
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CreateCuentaDTO(BaseModel):  # POST
-    titular: str
-    numero_cuenta: str
-    tipo_cuenta: str
-    moneda: str
-    saldo: Decimal = Decimal("0")
-    cbu: str | None = None
-    alias: str | None = None
+    inversor_id: int
+    numero_comitente: str = Field(max_length=50)
+    saldo_ars: Decimal = Field(default=Decimal("0.00"), ge=0)
+    saldo_usd: Decimal = Field(default=Decimal("0.00"), ge=0)
 
 
 class UpdateCuentaDTO(BaseModel):  # PUT/PATCH
-    titular: str | None = None
-    numero_cuenta: str | None = None
-    tipo_cuenta: str | None = None
-    moneda: str | None = None
-    saldo: Decimal | None = None
-    cbu: str | None = None
-    alias: str | None = None
+    inversor_id: int | None = None
+    numero_comitente: str | None = Field(default=None, max_length=50)
+    saldo_ars: Decimal | None = Field(default=None, ge=0)
+    saldo_usd: Decimal | None = Field(default=None, ge=0)
 
 
 class DeleteCuentaDTO(BaseModel):  # DELETE
@@ -33,12 +27,9 @@ class GetCuentaDTO(BaseModel):  # GET (individual)
 
 class CuentaResponseDTO(BaseModel):
     id: int
-    titular: str
-    numero_cuenta: str
-    tipo_cuenta: str
-    moneda: str
-    saldo: Decimal
-    cbu: str | None = None
-    alias: str | None = None
+    inversor_id: int
+    numero_comitente: str
+    saldo_ars: Decimal
+    saldo_usd: Decimal
 
     model_config = {"from_attributes": True}
