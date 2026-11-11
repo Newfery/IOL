@@ -5,26 +5,19 @@ from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
-
 class Operacion(Base):
     __tablename__ = "operacion"
 
     id = Column(Integer, primary_key=True, index=True)
-
     cuenta_id = Column(Integer, ForeignKey("cuenta.id"), nullable=False)
     activo_id = Column(Integer, ForeignKey("activo.id"), nullable=False)
-
     tipo = Column(String(20), nullable=False)
     cantidad = Column(DECIMAL(18, 4), nullable=False)
     precio_unitario = Column(DECIMAL(15, 4), nullable=False)
-
     comision = Column(DECIMAL(15, 2), nullable=False)
     total = Column(DECIMAL(15, 2), nullable=False)
-
     resultado_realizado = Column(DECIMAL(15, 2), nullable=True)
-
     fecha = Column(DateTime, server_default=func.now())
-
     estado = Column(String(20), nullable=False)
 
     # Relaciones
