@@ -1,9 +1,10 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy.orm import Session
 
 from src.db.connection import get_db
+from src.dtos.cotizacion_dto import CotizacionResponseDTO
 from src.dtos.activo_dto import (
     CreateActivoDTO,
     UpdateActivoDTO,
@@ -13,10 +14,18 @@ from src.schemas.activos_schema import (
     CreateActivoSchema,
     UpdateActivoSchema
 )
+from src.services.cotizacion_service import CotizacionService
 from src.services.activos_service import ActivoService
 
 
 router = APIRouter(prefix="/activos", tags=["activos"])
+
+
+@router.get("/cotizacion/{ticker}", response_model=CotizacionResponseDTO)
+def get_cotizacion(
+    ticker: str = Path(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.^=_-]+$")
+):
+    return CotizacionService.obtener(ticker)
 
 
 @router.post("/", response_model=ActivoResponseDTO, status_code=status.HTTP_201_CREATED)

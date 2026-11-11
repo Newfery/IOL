@@ -41,6 +41,19 @@ Abrir http://localhost:8000/docs para ver Swagger.
 
 El backend sirve el ícono del navegador desde `src/static/favicon.ico` en `/favicon.ico`.
 
+## Cotizaciones con Yahoo Finance
+
+El endpoint `GET /api/activos/cotizacion/{ticker}` consulta la última cotización
+diaria disponible en Yahoo Finance. Por ejemplo:
+
+```text
+GET http://localhost:8000/api/activos/cotizacion/AAPL
+GET http://localhost:8000/api/activos/cotizacion/GGAL.BA
+```
+
+Devuelve el último cierre, el cierre anterior, la variación porcentual y la fecha.
+No requiere una API key ni modifica el precio guardado en la base de datos.
+
 ---
 
 ## Estructura de carpetas
