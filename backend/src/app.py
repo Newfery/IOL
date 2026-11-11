@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
 from src.middlewares.error_middleware import app_error_handler
-from src.routers import cuenta_router, inversor_router, movimiento_router, operacion_router
+from src.routers import cuenta_router, inversor_router, movimiento_router, operacion_router, activos_router
 from src.utils.errors import AppError
 
 app = FastAPI(title="Initial Structure API")
@@ -22,6 +22,7 @@ app.include_router(inversor_router.router, prefix="/api")
 app.include_router(cuenta_router.router, prefix="/api")
 app.include_router(movimiento_router.router, prefix="/api")
 app.include_router(operacion_router.router, prefix="/api")
+app.include_router(activos_router.router, prefix="/api")
 # TODO: registrar product_router cuando se implemente
 # app.include_router(product_router.router, prefix="/api")
 
