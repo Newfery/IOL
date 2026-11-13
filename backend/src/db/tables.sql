@@ -96,7 +96,8 @@
         fecha_pago TIMESTAMP NOT NULL,
         
         CONSTRAINT fk_dividendo_activo FOREIGN KEY (activo_id) REFERENCES activo(id),
-        CONSTRAINT chk_dividendo_monto CHECK (monto_por_unidad > 0)
+        CONSTRAINT chk_dividendo_monto CHECK (monto_por_unidad > 0),
+        CONSTRAINT uq_dividendo_activo_fecha_pago UNIQUE (activo_id, fecha_pago)
     );
 
     -- 7. Tabla Intermedia: Tenencias (Cuenta - Activo)

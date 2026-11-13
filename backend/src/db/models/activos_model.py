@@ -1,10 +1,9 @@
 from sqlalchemy import Column, Integer, String, Boolean, Numeric, CheckConstraint
-from sqlalchemy.orm import declarative_base
 
-Base = declarative_base()
+from src.db.connection import Base
 
 class Activo(Base):
-    __tablename__ = "activos"
+    __tablename__ = "activo"
 
     id = Column(Integer, primary_key=True)
     ticker = Column(String(20), unique=True, nullable=False)
