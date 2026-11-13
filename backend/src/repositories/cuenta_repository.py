@@ -2,7 +2,10 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from src.db.models.activos_model import Activo
 from src.db.models.cuenta_model import Cuenta
+from src.db.models.operacion_model import Operacion
+from src.db.models.tenencia_model import Tenencia
 
 
 class CuentaRepository:
@@ -32,6 +35,33 @@ class CuentaRepository:
 
     def list_all(self) -> list[Cuenta]:
         return self.db.query(Cuenta).all()
+
+    def list_tenencias(self, cuenta_id: int) -> list[tuple[Tenencia, Activo]]:
+        return (
+            self.db.query(Tenencia, Activo)
+            .join(Activo, Activo.id == Tenencia.activo_id)
+            .filter(Tenencia.cuenta_id == cuenta_id)
+            .order_by(Activo.ticker)
+            .all()
+        )
+
+    def realized_gains_by_year(self, cuenta_id: int) -> list[tuple[int, object]]:
+        from sqlalchemy import extract, func
+
+        return (
+            self.db.query(
+                extract("year", Operacion.fecha).label("anio"),
+                func.coalesce(func.sum(Operacion.resultado_realizado), 0),
+            )
+            .filter(
+                Operacion.cuenta_id == cuenta_id,
+                Operacion.tipo == "venta",
+                Operacion.estado == "ejecutada",
+            )
+            .group_by(extract("year", Operacion.fecha))
+            .order_by(extract("year", Operacion.fecha))
+            .all()
+        )
 
     def update(self, cuenta_id: int, **fields: object) -> Cuenta | None:
         cuenta = self.find_by_id(cuenta_id)

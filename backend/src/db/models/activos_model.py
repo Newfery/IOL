@@ -14,7 +14,7 @@ class Activo(Base):
     moneda = Column(String(3), nullable=False)
     precio_actual = Column(Numeric(15, 2), nullable=False)
     nivel_riesgo = Column(Integer, nullable=False)
-    activo = Column(Boolean, default=True)
+    activo = Column(Boolean, default=True, nullable=False)
     inversores_favoritos = relationship(
         "Inversor",
         secondary=Favorito.__table__,

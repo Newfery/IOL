@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -10,9 +10,34 @@ from src.db.models.cuenta_model import Cuenta
 from src.db.models.activos_model import Activo
 from src.db.models.tenencia_model import Tenencia
 from src.db.models.inversor_model import Inversor
+from src.mappers.operacion_mapper import OperacionMapper
+from src.repositories.operacion_repository import OperacionRepository
 
 
 class OperacionService:
+    @staticmethod
+    def _dinero(monto: Decimal) -> Decimal:
+        return monto.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @staticmethod
+    def historial(
+        db: Session,
+        cuenta_id: int,
+        fecha_desde: datetime | None = None,
+        fecha_hasta: datetime | None = None,
+        tipo: str | None = None,
+        ticker: str | None = None,
+    ) -> dict[str, object]:
+        operaciones = OperacionRepository.filtrar_operaciones(
+            db, cuenta_id, fecha_desde, fecha_hasta, tipo, ticker
+        )
+        comisiones = OperacionRepository.obtener_total_comisiones(
+            db, cuenta_id, fecha_desde, fecha_hasta
+        )
+        return {
+            "operaciones": OperacionMapper.to_dto_list(operaciones),
+            "total_comisiones": comisiones,
+        }
 
     # Comprueba si el mercado está abierto
     @staticmethod
@@ -125,7 +150,7 @@ class OperacionService:
             )
 
         # Comprueba que el activo esté habilitado
-        if not bool(activo.activos):
+        if not bool(activo.activo):
             raise HTTPException(
                 status_code=400,
                 detail="El activo está suspendido"
@@ -146,8 +171,8 @@ class OperacionService:
         # Calcula el monto y la comisión
         precio = Decimal(str(activo.precio_actual))
         monto = cantidad * precio
-        comision = monto * Decimal("0.005")
-        total = monto + comision
+        comision = OperacionService._dinero(monto * Decimal("0.005"))
+        total = OperacionService._dinero(monto + comision)
 
         # Comprueba que haya saldo suficiente
         moneda = str(activo.moneda)
@@ -287,15 +312,15 @@ class OperacionService:
         # Calcula el monto, la comisión y el total
         precio = Decimal(str(activo.precio_actual))
         monto = cantidad * precio
-        comision = monto * Decimal("0.005")
-        total = monto - comision
+        comision = OperacionService._dinero(monto * Decimal("0.005"))
+        total = OperacionService._dinero(monto - comision)
 
         # Calcula la ganancia o pérdida realizada
         precio_promedio = Decimal(str(tenencia.precio_promedio))
 
-        resultado = (
-            cantidad * (precio - precio_promedio)
-        ) - comision
+        resultado = OperacionService._dinero(
+            cantidad * (precio - precio_promedio) - comision
+        )
 
         try:
             # Acredita el dinero en la cuenta
@@ -343,3 +368,128 @@ class OperacionService:
         except Exception:
             db.rollback()
             raise
+
+    @staticmethod
+    def convertir_mep(db: Session, cuenta_id: int, monto_ars: Decimal):
+        OperacionService.verificar_horario()
+        monto_ars = OperacionService._dinero(Decimal(str(monto_ars)))
+        if monto_ars <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="El monto en ARS debe ser al menos 0.01",
+            )
+
+        cuenta = (
+            db.query(Cuenta)
+            .filter(Cuenta.id == cuenta_id)
+            .with_for_update()
+            .first()
+        )
+        if cuenta is None:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+
+        al30 = db.query(Activo).filter(Activo.ticker == "AL30").first()
+        al30d = db.query(Activo).filter(Activo.ticker == "AL30D").first()
+        if al30 is None or al30d is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Se requieren los activos AL30 y AL30D para operar MEP",
+            )
+        if str(al30.moneda) != "ARS" or str(al30d.moneda) != "USD":
+            raise HTTPException(
+                status_code=400,
+                detail="AL30 debe cotizar en ARS y AL30D en USD",
+            )
+        if not bool(al30.activo) or not bool(al30d.activo):
+            raise HTTPException(
+                status_code=400,
+                detail="AL30 o AL30D está suspendido",
+            )
+        OperacionService.verificar_riesgo(db, cuenta, al30)
+
+        precio_ars = Decimal(str(al30.precio_actual))
+        precio_usd = Decimal(str(al30d.precio_actual))
+        cantidad = (monto_ars / precio_ars).quantize(
+            Decimal("0.0001"), rounding=ROUND_HALF_UP
+        )
+        if cantidad <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="El monto no alcanza para comprar una unidad mínima de AL30",
+            )
+
+        monto_compra = OperacionService._dinero(cantidad * precio_ars)
+        comision_compra = OperacionService._dinero(
+            monto_compra * Decimal("0.005")
+        )
+        total_compra = monto_compra + comision_compra
+        saldo_ars = Decimal(str(cuenta.saldo_ars))
+        if saldo_ars < total_compra:
+            raise HTTPException(
+                status_code=400,
+                detail="Saldo ARS insuficiente para realizar la operación MEP",
+            )
+
+        monto_venta = OperacionService._dinero(cantidad * precio_usd)
+        comision_venta = OperacionService._dinero(
+            monto_venta * Decimal("0.005")
+        )
+        total_venta = monto_venta - comision_venta
+        tipo_cambio = precio_ars / precio_usd
+
+        try:
+            cuenta.saldo_ars = saldo_ars - total_compra  # type: ignore[assignment]
+            cuenta.saldo_usd = (  # type: ignore[assignment]
+                Decimal(str(cuenta.saldo_usd)) + total_venta
+            )
+            compra = Operacion(
+                cuenta_id=cuenta_id,
+                activo_id=al30.id,
+                tipo="compra",
+                cantidad=cantidad,
+                precio_unitario=precio_ars,
+                comision=comision_compra,
+                total=total_compra,
+                estado="ejecutada",
+            )
+            venta = Operacion(
+                cuenta_id=cuenta_id,
+                activo_id=al30d.id,
+                tipo="venta",
+                cantidad=cantidad,
+                precio_unitario=precio_usd,
+                comision=comision_venta,
+                total=total_venta,
+                estado="ejecutada",
+            )
+            db.add_all([compra, venta])
+            db.commit()
+            db.refresh(compra)
+            db.refresh(venta)
+            return {
+                "tipo_cambio": tipo_cambio,
+                "monto_ars_debitado": total_compra,
+                "monto_usd_acreditado": total_venta,
+                "operaciones": [
+                    OperacionService._operacion_a_dict(compra),
+                    OperacionService._operacion_a_dict(venta),
+                ],
+            }
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _operacion_a_dict(operacion: Operacion) -> dict[str, object]:
+        return {
+            "id": operacion.id,
+            "cuenta_id": operacion.cuenta_id,
+            "activo_id": operacion.activo_id,
+            "tipo": operacion.tipo,
+            "cantidad": operacion.cantidad,
+            "precio_unitario": operacion.precio_unitario,
+            "comision": operacion.comision,
+            "total": operacion.total,
+            "estado": operacion.estado,
+            "fecha": operacion.fecha,
+        }

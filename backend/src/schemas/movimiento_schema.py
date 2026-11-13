@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 class CreateMovimientoSchema(BaseModel):
     cuenta_id: int = Field(gt=0)
-    tipo: Literal["deposito", "extraccion", "dividendo"]
+    tipo: Literal["deposito", "extraccion"]
     moneda: Literal["ARS", "USD"]
     monto: Decimal = Field(gt=0)
     descripcion: str | None = None

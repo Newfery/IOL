@@ -3,6 +3,7 @@ from typing import Literal
 
 from sqlalchemy.orm import Session
 
+from src.db.models.cuenta_model import Cuenta
 from src.db.models.movimiento_model import Movimiento
 
 
@@ -29,6 +30,14 @@ class MovimientoRepository:
         self.db.commit()
         self.db.refresh(movimiento)
         return movimiento
+
+    def get_cuenta_for_update(self, cuenta_id: int) -> Cuenta | None:
+        return (
+            self.db.query(Cuenta)
+            .filter(Cuenta.id == cuenta_id)
+            .with_for_update()
+            .first()
+        )
 
     def find_by_id(self, movimiento_id: int) -> Movimiento | None:
         return (

@@ -14,8 +14,10 @@ from src.schemas.activos_schema import (
     CreateActivoSchema,
     UpdateActivoSchema
 )
+from src.schemas.precio_activo_schema import UpdatePrecioActivoSchema
 from src.services.cotizacion_service import CotizacionService
 from src.services.activos_service import ActivoService
+from src.services.favoritos_service import FavoritosService
 
 
 router = APIRouter(prefix="/activos", tags=["activos"])
@@ -43,6 +45,16 @@ def get_activos(
     return ActivoService(db).get_all(tipo=tipo, moneda=moneda)
 
 
+@router.get("/mas-operados")
+def get_activos_mas_operados(db: Session = Depends(get_db)):
+    return ActivoService(db).mas_operados()
+
+
+@router.get("/mas-favoritos")
+def get_activos_mas_favoritos(db: Session = Depends(get_db)):
+    return FavoritosService(db).mas_favoritos()
+
+
 @router.get("/{activo_id}", response_model=ActivoResponseDTO)
 def get_activo(activo_id: int, db: Session = Depends(get_db)):
     result = ActivoService(db).get_by_id(activo_id)
@@ -53,6 +65,24 @@ def get_activo(activo_id: int, db: Session = Depends(get_db)):
             detail="Activo no encontrado"
         )
 
+    return result
+
+
+@router.patch("/{activo_id}/precio", response_model=ActivoResponseDTO)
+def patch_precio_activo(
+    activo_id: int,
+    payload: UpdatePrecioActivoSchema,
+    db: Session = Depends(get_db),
+):
+    result = ActivoService(db).update(
+        activo_id,
+        UpdateActivoDTO(precio_actual=payload.precio),
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Activo no encontrado",
+        )
     return result
 
 

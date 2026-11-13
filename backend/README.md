@@ -54,6 +54,32 @@ GET http://localhost:8000/api/activos/cotizacion/GGAL.BA
 Devuelve el último cierre, el cierre anterior, la variación porcentual y la fecha.
 No requiere una API key ni modifica el precio guardado en la base de datos.
 
+## Funcionalidades del broker
+
+Las rutas de negocio se publican bajo `/api`:
+
+- `POST /inversores`: da de alta al inversor y crea automáticamente una cuenta
+  comitente con ambos saldos en cero. `PATCH /inversores/{id}/perfil` cambia
+  su perfil de riesgo.
+- `GET /activos?tipo=...&moneda=...` filtra el catálogo;
+  `PATCH /activos/{id}/precio` actualiza el precio vigente.
+- `POST /movimientos` registra depósitos y extracciones y actualiza el saldo
+  de la cuenta en la misma transacción.
+- `POST /operaciones` recibe `cuenta_id`, `activo_id`, `tipo` y `cantidad`;
+  el precio, la comisión y el total se calculan en el servidor.
+- `POST /cuentas/{id}/mep` recibe `monto_ars` y registra atómicamente la compra
+  de AL30 y la venta de AL30D. El cambio informado es `precio AL30 / precio
+  AL30D`; se aplica la comisión de 0,5% a cada pata.
+- `GET /cuentas/{id}/cartera` informa tenencias y totales en ARS/USD por
+  separado; composición porcentual por tipo se calcula dentro de cada moneda,
+  sin convertir entre ellas.
+- `GET /cuentas/{id}/operaciones` admite `fecha_desde`, `fecha_hasta`, `tipo`
+  y `ticker`, y devuelve operaciones ordenadas por fecha y comisiones.
+- `GET /activos/mas-operados` ordena por volumen de unidades negociadas en los
+  últimos siete días; `GET /activos/mas-favoritos` ordena por cantidad de
+  inversores que los marcaron. `GET /cuentas/{id}/ganancias-realizadas`
+  agrupa el resultado de ventas ejecutadas por año.
+
 ---
 
 ## Estructura de carpetas

@@ -11,17 +11,7 @@ class OperacionCreate(BaseModel):
     activo_id: int
 
     tipo: str = Field(..., pattern="^(compra|venta)$")
-
-    cantidad: Decimal = Field(..., gt=0)
-    precio_unitario: Decimal = Field(..., gt=0)
-
-    comision: Decimal = Field(..., ge=0)
-    total: Decimal = Field(..., gt=0)
-
-    estado: str = Field(
-        default="pendiente",
-        pattern="^(pendiente|ejecutada|rechazada)$"
-    )
+    cantidad: Decimal = Field(..., gt=0, max_digits=18, decimal_places=4)
 
 
 # DTO para devolver una operación

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class CreateMovimientoDTO(BaseModel):  # POST
     cuenta_id: int
-    tipo: Literal["deposito", "extraccion", "dividendo"]
+    tipo: Literal["deposito", "extraccion"]
     moneda: Literal["ARS", "USD"]
     monto: Decimal = Field(gt=0)
     descripcion: str | None = None

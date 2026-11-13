@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.dtos.activo_dto import (
@@ -7,6 +8,7 @@ from src.dtos.activo_dto import (
 )
 from src.mappers.activos_mapper import activo_a_dto
 from src.repositories.activos_repository import ActivoRepository
+from src.utils.errors import ConflictError
 
 
 class ActivoService:
@@ -14,8 +16,23 @@ class ActivoService:
         self.repo = ActivoRepository(db)
 
     def create(self, dto: CreateActivoDTO) -> ActivoResponseDTO:
-        activo = self.repo.create(**dto.model_dump())
+        if self.repo.get_by_ticker(dto.ticker) is not None:
+            raise ConflictError("El ticker ya está registrado")
+        try:
+            activo = self.repo.create(**dto.model_dump())
+        except IntegrityError as exc:
+            self.repo.db.rollback()
+            raise ConflictError("El ticker ya está registrado") from exc
         return activo_a_dto(activo)
+
+    def mas_operados(self) -> list[dict[str, object]]:
+        return [
+            {
+                "activo": activo_a_dto(activo),
+                "volumen": volumen,
+            }
+            for activo, volumen in self.repo.get_mas_operados()
+        ]
 
     def get_all(
         self,

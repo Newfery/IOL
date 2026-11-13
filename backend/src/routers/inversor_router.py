@@ -56,6 +56,29 @@ def patch_inversor(inversor_id: int, payload: UpdateInversorSchema, db: Session 
     return result
 
 
+@router.patch("/{inversor_id}/perfil", response_model=InversorResponseDTO)
+def patch_perfil_riesgo(
+    inversor_id: int,
+    payload: UpdateInversorSchema,
+    db: Session = Depends(get_db),
+):
+    if payload.perfil_riesgo is None or payload.model_fields_set != {"perfil_riesgo"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Debe enviarse únicamente perfil_riesgo",
+        )
+    result = InversorService(db).update(
+        inversor_id,
+        UpdateInversorDTO(perfil_riesgo=payload.perfil_riesgo),
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Inversor no encontrado",
+        )
+    return result
+
+
 @router.delete("/{inversor_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_inversor(inversor_id: int, db: Session = Depends(get_db)):
     deleted = InversorService(db).delete(inversor_id)

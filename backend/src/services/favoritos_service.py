@@ -41,6 +41,19 @@ class FavoritosService:
             for favorito in self.repo.get_by_inversor(inversor_id)
         ]
 
+    def mas_favoritos(self) -> list[dict[str, object]]:
+        return [
+            {
+                "activo_id": activo.id,
+                "ticker": activo.ticker,
+                "nombre": activo.nombre,
+                "tipo": activo.tipo,
+                "moneda": activo.moneda,
+                "cantidad_favoritos": cantidad,
+            }
+            for activo, cantidad in self.repo.get_mas_favoritos()
+        ]
+
     def delete(self, inversor_id: int, activo_id: int) -> bool:
         favorito = self.repo.get_by_id(inversor_id, activo_id)
         if favorito is None:

@@ -1,8 +1,10 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.dtos.inversor_dto import CreateInversorDTO, UpdateInversorDTO, InversorResponseDTO
 from src.mappers.inversor_mapper import to_inversor_response
 from src.repositories.inversor_repository import InversorRepository
+from src.utils.errors import ConflictError
 
 
 class InversorService:
@@ -10,12 +12,20 @@ class InversorService:
         self.repo = InversorRepository(db)
 
     def create(self, dto: CreateInversorDTO) -> InversorResponseDTO:
-        inversor = self.repo.create(
-            nombre=dto.nombre,
-            email=dto.email,
-            cuit=dto.cuit,
-            perfil_riesgo=dto.perfil_riesgo
-        )
+        if self.repo.get_by_email(dto.email) is not None:
+            raise ConflictError("Este email ya está en uso")
+        if self.repo.get_by_cuit(dto.cuit) is not None:
+            raise ConflictError("Este CUIT ya está en uso")
+        try:
+            inversor = self.repo.create(
+                nombre=dto.nombre,
+                email=dto.email,
+                cuit=dto.cuit,
+                perfil_riesgo=dto.perfil_riesgo
+            )
+        except IntegrityError as exc:
+            self.repo.db.rollback()
+            raise ConflictError("El email o CUIT ya está en uso") from exc
         return to_inversor_response(inversor)
 
     def get_by_id(self, inversor_id: int) -> InversorResponseDTO | None:
@@ -35,10 +45,10 @@ class InversorService:
         if inversor is None:
             return None
 
-        inversor.nombre = dto.nombre or inversor.nombre
-        inversor.email = dto.email or inversor.email
-        inversor.cuit = dto.cuit or inversor.cuit
-        inversor.perfil_riesgo = dto.perfil_riesgo or inversor.perfil_riesgo
+        for campo in ("nombre", "email", "cuit", "perfil_riesgo"):
+            valor = getattr(dto, campo)
+            if valor is not None:
+                setattr(inversor, campo, valor)
 
         updated = self.repo.update(inversor)
         return to_inversor_response(updated)

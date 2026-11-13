@@ -1,5 +1,8 @@
+from uuid import uuid4
+
 from sqlalchemy.orm import Session
 
+from src.db.models.cuenta_model import Cuenta
 from src.db.models.inversor_model import Inversor
 
 
@@ -15,6 +18,15 @@ class InversorRepository:
             perfil_riesgo=perfil_riesgo
         )
         self.db.add(inversor)
+        self.db.flush()
+        self.db.add(
+            Cuenta(
+                inversor_id=inversor.id,
+                numero_comitente=f"COM-{uuid4().hex.upper()}",
+                saldo_ars=0,
+                saldo_usd=0,
+            )
+        )
         self.db.commit()
         self.db.refresh(inversor)
         return inversor
@@ -24,6 +36,9 @@ class InversorRepository:
 
     def get_by_email(self, email: str) -> Inversor | None:
         return self.db.query(Inversor).filter(Inversor.email == email).first()
+
+    def get_by_cuit(self, cuit: str) -> Inversor | None:
+        return self.db.query(Inversor).filter(Inversor.cuit == cuit).first()
 
     def update(self, inversor: Inversor) -> Inversor:
         self.db.add(inversor)

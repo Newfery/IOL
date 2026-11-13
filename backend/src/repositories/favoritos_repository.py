@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -41,3 +42,13 @@ class FavoritosRepository:
     def delete(self, favorito: Favorito) -> None:
         self.db.delete(favorito)
         self.db.commit()
+
+    def get_mas_favoritos(self, limite: int = 10) -> list[tuple[Activo, int]]:
+        return (
+            self.db.query(Activo, func.count(Favorito.inversor_id).label("cantidad"))
+            .join(Favorito, Favorito.activo_id == Activo.id)
+            .group_by(Activo.id)
+            .order_by(func.count(Favorito.inversor_id).desc(), Activo.ticker)
+            .limit(limite)
+            .all()
+        )
