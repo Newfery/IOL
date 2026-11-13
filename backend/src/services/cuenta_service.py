@@ -1,6 +1,7 @@
 from decimal import Decimal
 from typing import TypedDict
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.dtos.cuenta_dto import (
@@ -10,6 +11,8 @@ from src.dtos.cuenta_dto import (
 )
 from src.mappers.cuenta_mapper import to_cuenta_response
 from src.repositories.cuenta_repository import CuentaRepository
+from src.utils.errors import ConflictError
+from src.utils.integrity_errors import is_unique_violation
 
 
 class ValorizacionPorMoneda(TypedDict):
@@ -53,12 +56,20 @@ class CuentaService:
         self.repo = CuentaRepository(db)
 
     def create(self, dto: CreateCuentaDTO) -> CuentaResponseDTO:
-        cuenta = self.repo.create(
-            inversor_id=dto.inversor_id,
-            numero_comitente=dto.numero_comitente,
-            saldo_ars=dto.saldo_ars,
-            saldo_usd=dto.saldo_usd,
-        )
+        try:
+            cuenta = self.repo.create(
+                inversor_id=dto.inversor_id,
+                numero_comitente=dto.numero_comitente,
+                saldo_ars=dto.saldo_ars,
+                saldo_usd=dto.saldo_usd,
+            )
+        except IntegrityError as exc:
+            self.repo.db.rollback()
+            if is_unique_violation(exc):
+                raise ConflictError(
+                    "El inversor ya tiene una cuenta o el número de comitente ya está registrado"
+                ) from exc
+            raise
         return to_cuenta_response(cuenta)
 
     def get_by_id(self, cuenta_id: int) -> CuentaResponseDTO | None:
@@ -164,7 +175,15 @@ class CuentaService:
         dto: UpdateCuentaDTO,
     ) -> CuentaResponseDTO | None:
         fields: dict[str, int | str | Decimal] = dto.model_dump(exclude_unset=True)
-        cuenta = self.repo.update(cuenta_id, **fields)
+        try:
+            cuenta = self.repo.update(cuenta_id, **fields)
+        except IntegrityError as exc:
+            self.repo.db.rollback()
+            if is_unique_violation(exc):
+                raise ConflictError(
+                    "El inversor ya tiene una cuenta o el número de comitente ya está registrado"
+                ) from exc
+            raise
         if cuenta is None:
             return None
         return to_cuenta_response(cuenta)

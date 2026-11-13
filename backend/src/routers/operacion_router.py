@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
@@ -18,7 +18,11 @@ router = APIRouter(
 
 
 # Registrar una nueva operación
-@router.post("/", response_model=OperacionResponse)
+@router.post(
+    "/",
+    response_model=OperacionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def crear_operacion(
     dto: OperacionCreate,
     db: Session = Depends(get_db)

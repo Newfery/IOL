@@ -5,6 +5,7 @@ from src.dtos.inversor_dto import CreateInversorDTO, UpdateInversorDTO, Inversor
 from src.mappers.inversor_mapper import to_inversor_response
 from src.repositories.inversor_repository import InversorRepository
 from src.utils.errors import ConflictError
+from src.utils.integrity_errors import is_unique_violation
 
 
 class InversorService:
@@ -25,7 +26,9 @@ class InversorService:
             )
         except IntegrityError as exc:
             self.repo.db.rollback()
-            raise ConflictError("El email o CUIT ya está en uso") from exc
+            if is_unique_violation(exc):
+                raise ConflictError("El email o CUIT ya está en uso") from exc
+            raise
         return to_inversor_response(inversor)
 
     def get_by_id(self, inversor_id: int) -> InversorResponseDTO | None:
@@ -50,7 +53,13 @@ class InversorService:
             if valor is not None:
                 setattr(inversor, campo, valor)
 
-        updated = self.repo.update(inversor)
+        try:
+            updated = self.repo.update(inversor)
+        except IntegrityError as exc:
+            self.repo.db.rollback()
+            if is_unique_violation(exc):
+                raise ConflictError("El email o CUIT ya está en uso") from exc
+            raise
         return to_inversor_response(updated)
 
     def delete(self, inversor_id: int) -> bool:

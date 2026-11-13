@@ -9,6 +9,7 @@ from src.dtos.activo_dto import (
 from src.mappers.activos_mapper import activo_a_dto
 from src.repositories.activos_repository import ActivoRepository
 from src.utils.errors import ConflictError
+from src.utils.integrity_errors import is_unique_violation
 
 
 class ActivoService:
@@ -22,7 +23,9 @@ class ActivoService:
             activo = self.repo.create(**dto.model_dump())
         except IntegrityError as exc:
             self.repo.db.rollback()
-            raise ConflictError("El ticker ya está registrado") from exc
+            if is_unique_violation(exc):
+                raise ConflictError("El ticker ya está registrado") from exc
+            raise
         return activo_a_dto(activo)
 
     def mas_operados(self) -> list[dict[str, object]]:
@@ -61,7 +64,13 @@ class ActivoService:
             if valor is not None:
                 setattr(activo, campo, valor)
 
-        actualizado = self.repo.update(activo)
+        try:
+            actualizado = self.repo.update(activo)
+        except IntegrityError as exc:
+            self.repo.db.rollback()
+            if is_unique_violation(exc):
+                raise ConflictError("El ticker ya está registrado") from exc
+            raise
         return activo_a_dto(actualizado)
 
     def delete(self, activo_id: int) -> bool:
