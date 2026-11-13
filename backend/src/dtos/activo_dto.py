@@ -13,7 +13,7 @@ class CreateActivoDTO(BaseModel):
     activo: bool = True
 
 
-class UpdateActivoDTO(BaseModel): 
+class UpdateActivoDTO(BaseModel):
     ticker: str | None = None
     nombre: str | None = None
     tipo: Literal["accion", "cedear", "bono"] | None = None
@@ -23,11 +23,11 @@ class UpdateActivoDTO(BaseModel):
     activo: bool | None = None
 
 
-class DeleteActivoDTO(BaseModel): 
+class DeleteActivoDTO(BaseModel):
     id: int
 
 
-class GetActivoDTO(BaseModel): 
+class GetActivoDTO(BaseModel):
     id: int
 
 
@@ -42,12 +42,3 @@ class ActivoResponseDTO(BaseModel):
     activo: bool
 
     model_config = {"from_attributes": True}
-
-class UpdateActivoDTO(BaseModel):
-    ticker: str | None = None
-    nombre: str | None = None
-    tipo: str | None = None
-    moneda: str | None = None
-    precio_actual: Decimal | None = None
-    nivel_riesgo: int | None = None
-    activo: bool | None = None

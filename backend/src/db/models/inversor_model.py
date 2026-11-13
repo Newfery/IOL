@@ -1,8 +1,11 @@
 from datetime import date
 
 from sqlalchemy import CheckConstraint, Column, Date, Integer, String
+from sqlalchemy.orm import relationship
 
 from src.db.connection import Base
+from src.db.models.activos_model import Activo
+from src.db.models.favoritos_model import Favorito
 
 
 class Inversor(Base):
@@ -14,6 +17,11 @@ class Inversor(Base):
     cuit = Column(String(11), unique=True, nullable=False)
     perfil_riesgo = Column(String, nullable=False)
     fecha_alta = Column(Date, default=date.today)
+    favoritos = relationship(
+        Activo,
+        secondary=Favorito.__table__,
+        back_populates="inversores_favoritos",
+    )
 
     __table_args__ = (
         CheckConstraint(

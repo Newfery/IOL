@@ -116,11 +116,11 @@
     );
 
     -- 8. Tabla Intermedia: Favoritos (Inversor - Activo)
-    CREATE TABLE favorito (
+    CREATE TABLE favoritos (
         inversor_id INT NOT NULL,
         activo_id INT NOT NULL,
         
         PRIMARY KEY (inversor_id, activo_id),
-        CONSTRAINT fk_favorito_inversor FOREIGN KEY (inversor_id) REFERENCES inversor(id) ON DELETE CASCADE,
-        CONSTRAINT fk_favorito_activo FOREIGN KEY (activo_id) REFERENCES activo(id) ON DELETE CASCADE
+        CONSTRAINT fk_favoritos_inversor FOREIGN KEY (inversor_id) REFERENCES inversor(id) ON DELETE CASCADE,
+        CONSTRAINT fk_favoritos_activo FOREIGN KEY (activo_id) REFERENCES activo(id) ON DELETE CASCADE
     );

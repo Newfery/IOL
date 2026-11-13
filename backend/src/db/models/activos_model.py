@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, Boolean, Numeric, CheckConstraint
+from sqlalchemy.orm import relationship
 
 from src.db.connection import Base
+from src.db.models.favoritos_model import Favorito
 
 class Activo(Base):
     __tablename__ = "activo"
@@ -13,6 +15,11 @@ class Activo(Base):
     precio_actual = Column(Numeric(15, 2), nullable=False)
     nivel_riesgo = Column(Integer, nullable=False)
     activo = Column(Boolean, default=True)
+    inversores_favoritos = relationship(
+        "Inversor",
+        secondary=Favorito.__table__,
+        back_populates="favoritos",
+    )
 
     __table_args__ = (
         CheckConstraint("tipo IN ('accion', 'cedear', 'bono')"),

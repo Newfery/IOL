@@ -13,6 +13,11 @@ router = APIRouter(prefix="/inversores", tags=["inversores"])
 def create_inversor(payload: CreateInversorSchema, db: Session = Depends(get_db)):
     """Valida con Schema, arma DTO y llama al service."""
     dto = CreateInversorDTO(**payload.model_dump())
+    if InversorService(db).get_by_email(dto.email) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Este 'email' ya está en uso"
+        )
     return InversorService(db).create(dto)
 
 

@@ -1,9 +1,8 @@
 from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from sqlalchemy.orm import declarative_base
 
-Base = declarative_base()
+from src.db.connection import Base
 
 class Operacion(Base):
     __tablename__ = "operacion"
@@ -20,9 +19,8 @@ class Operacion(Base):
     fecha = Column(DateTime, server_default=func.now())
     estado = Column(String(20), nullable=False)
 
-    # Relaciones
-    cuenta = relationship("Cuenta", back_populates="operaciones")
-    activo = relationship("Activo", back_populates="operaciones")
+    cuenta = relationship("Cuenta")
+    activo = relationship("Activo")
 
     # Restricciones
     __table_args__ = (
