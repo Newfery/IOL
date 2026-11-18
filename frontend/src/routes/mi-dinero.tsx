@@ -4,7 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/lib/auth";
-import { getCuenta, getDolarQuotes, type Cuenta } from "@/lib/api";
+import { getCuenta, getDolarQuotes, getPlazos, getOrdenesPendientes, type Cuenta } from "@/lib/api";
 
 export const Route = createFileRoute("/mi-dinero")({
   head: () => ({
@@ -28,30 +28,27 @@ type Moneda = "ARS" | "USD";
 const ars = (n: number) => n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 2 });
 const usd = (n: number) => `US$ ${n.toLocaleString("es-AR", { maximumFractionDigits: 2 })}`;
 
-// Plazos simulados del dinero (TODO: GET ${API_URL}/api/cuenta/plazos)
-const MOCK_PLAZOS = [
-  { label: "Disponible para operar", detalle: "Liquidación inmediata", dias: 0, ars: 0.6, usd: 0.7 },
-  { label: "En liquidación (24 hs)", detalle: "Ventas de hoy", dias: 1, ars: 0.25, usd: 0.2 },
-  { label: "En liquidación (48 hs)", detalle: "Operaciones de ayer", dias: 2, ars: 0.15, usd: 0.1 },
-];
-
-// Operaciones pendientes simuladas (TODO: GET ${API_URL}/api/ordenes/pendientes)
-const MOCK_PENDIENTES = [
-  { desc: "Compra GGAL x50", ars: 321025, usd: 0 },
-  { desc: "Compra AL30 x5", ars: 0, usd: 260 },
-];
-
 function MiDinero() {
   const { user } = useAuth();
   const [cuenta, setCuenta] = useState<Cuenta | null>(null);
   const [quotes, setQuotes] = useState({ mep: 0, ccl: 0 });
   const [moneda, setMoneda] = useState<Moneda>("ARS");
   const [oculto, setOculto] = useState(false);
+  const [plazos, setPlazos] = useState<Awaited<ReturnType<typeof getPlazos>>>([]);
+  const [pendientes, setPendientes] = useState<Awaited<ReturnType<typeof getOrdenesPendientes>>>([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) return;
-    getCuenta(user.id).then(setCuenta);
-    getDolarQuotes().then(setQuotes);
+    Promise.allSettled([getCuenta(user.id), getDolarQuotes(), getPlazos(), getOrdenesPendientes()])
+      .then(([c, q, p, o]) => {
+        if (c.status === "fulfilled") setCuenta(c.value);
+        if (q.status === "fulfilled") setQuotes(q.value);
+        if (p.status === "fulfilled") setPlazos(p.value);
+        if (o.status === "fulfilled") setPendientes(o.value);
+        const failed = [c, q, p, o].find((result) => result.status === "rejected");
+        if (failed?.status === "rejected") setError((failed.reason as Error).message);
+      });
   }, [user]);
 
   const totalArs = cuenta ? cuenta.saldo_ars : 0;
@@ -60,14 +57,15 @@ function MiDinero() {
   const monto = (a: number, u: number) => (moneda === "ARS" ? a : u);
   const ocultar = (s: string) => (oculto ? s.replace(/[0-9]/g, "*") : s);
 
-  const comprometidoArs = MOCK_PENDIENTES.reduce((s, p) => s + p.ars, 0);
-  const comprometidoUsd = MOCK_PENDIENTES.reduce((s, p) => s + p.usd, 0);
+  const comprometidoArs = pendientes.reduce((s, p) => s + p.ars, 0);
+  const comprometidoUsd = pendientes.reduce((s, p) => s + p.usd, 0);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader />
       <main className="mx-auto max-w-3xl space-y-6 px-6 py-8">
         <h1 className="font-display text-2xl font-semibold">Mi dinero</h1>
+        {error && <p role="alert" className="text-sm text-loss">{error}</p>}
 
         <div className="flex gap-1 rounded-lg bg-muted p-1">
           {(["ARS", "USD"] as Moneda[]).map((m) => (
@@ -101,9 +99,8 @@ function MiDinero() {
             <h2 className="font-display text-lg font-semibold">Plazos de tu dinero</h2>
           </div>
           <ul className="divide-y divide-border">
-            {MOCK_PLAZOS.map((p) => {
-              const base = moneda === "ARS" ? totalArs : totalUsd;
-              const m = base * (moneda === "ARS" ? p.ars : p.usd);
+            {plazos.map((p) => {
+              const m = moneda === "ARS" ? p.ars : p.usd;
               return (
                 <li key={p.label} className="flex items-center justify-between p-4">
                   <div>
@@ -125,13 +122,13 @@ function MiDinero() {
           <div className="p-4">
             <p className="font-display text-2xl font-semibold">{ocultar(fmt(monto(comprometidoArs, comprometidoUsd)))}</p>
             <ul className="mt-4 space-y-2">
-              {MOCK_PENDIENTES.filter((p) => monto(p.ars, p.usd) > 0).map((p) => (
+              {pendientes.filter((p) => monto(p.ars, p.usd) > 0).map((p) => (
                 <li key={p.desc} className="flex items-center justify-between rounded-lg bg-muted px-4 py-3 text-sm">
                   <span>{p.desc}</span>
                   <span className="font-mono">{ocultar(fmt(monto(p.ars, p.usd)))}</span>
                 </li>
               ))}
-              {MOCK_PENDIENTES.every((p) => monto(p.ars, p.usd) === 0) && (
+              {pendientes.every((p) => monto(p.ars, p.usd) === 0) && (
                 <li className="py-4 text-center text-sm text-muted-foreground">No tenés operaciones pendientes en esta moneda.</li>
               )}
             </ul>

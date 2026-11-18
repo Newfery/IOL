@@ -134,6 +134,7 @@ CREATE TABLE grupo_de_inversion (
     nombre VARCHAR(255) UNIQUE NOT NULL,
     codigo_union VARCHAR(50) UNIQUE NOT NULL,
     creador_id INT NOT NULL,
+    password_hash VARCHAR(255),
     plata_disponible DECIMAL(15, 2) DEFAULT 0.00 NOT NULL,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -143,6 +144,16 @@ CREATE TABLE grupo_de_inversion (
     CONSTRAINT chk_grupo_plata
         CHECK (plata_disponible >= 0)
 );
+
+CREATE TABLE aporte_grupo (
+    id SERIAL PRIMARY KEY,
+    grupo_id INT NOT NULL REFERENCES grupo_de_inversion(id) ON DELETE CASCADE,
+    inversor_id INT NOT NULL REFERENCES inversor(id) ON DELETE CASCADE,
+    monto DECIMAL(15, 2) NOT NULL CHECK (monto > 0),
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE INDEX ix_aporte_grupo_grupo_inversor ON aporte_grupo (grupo_id, inversor_id);
 
 -- Integrantes del grupo
 CREATE TABLE grupo_inversor (

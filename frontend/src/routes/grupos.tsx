@@ -93,14 +93,18 @@ function Grupos() {
   }
   async function onContribute() {
     if (!group || amount <= 0) return;
-    await contributeToGroup(group.id, amount);
-    setMsg(`Aportaste ${fmt(amount)} al pozo.`);
-    refresh();
+    try {
+      await contributeToGroup(group.id, amount);
+      setMsg(`Aportaste ${fmt(amount)} al pozo.`);
+      await refresh();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
   }
   async function onBuy() {
     if (!group || !asset) return;
     try {
-      await groupBuy(group.id, asset.symbol, qty, asset.price);
+      await groupBuy(group.id, asset.symbol, qty);
       setMsg(`Compra grupal: ${qty} ${asset.symbol}.`);
       refresh();
     } catch (e) {

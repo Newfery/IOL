@@ -14,6 +14,7 @@ class GrupoDeInversion(Base):
         ForeignKey("inversor.id", name="fk_grupo_creador"),
         nullable=False,
     )
+    password_hash = Column(String(255), nullable=True)
     plata_disponible = Column(
         Numeric(15, 2),
         nullable=False,

@@ -1,5 +1,7 @@
 from pydantic import BaseModel, EmailStr
 
+from src.dtos.inversor_dto import InversorResponseDTO
+
 
 class LoginSchema(BaseModel):
     email: EmailStr
@@ -7,5 +9,6 @@ class LoginSchema(BaseModel):
 
 
 class TokenSchema(BaseModel):
-    access_token: str
+    token: str
+    inversor: InversorResponseDTO
     token_type: str = "bearer"

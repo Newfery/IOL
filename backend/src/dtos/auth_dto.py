@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from src.dtos.inversor_dto import InversorResponseDTO
+
 
 class LoginDTO(BaseModel):
     email: str
@@ -7,5 +9,6 @@ class LoginDTO(BaseModel):
 
 
 class TokenDTO(BaseModel):
-    access_token: str
+    token: str
+    inversor: InversorResponseDTO
     token_type: str = "bearer"

@@ -32,7 +32,8 @@ function Login() {
     setError("");
     setLoading(true);
     try {
-      signIn(await login(email, password));
+      const session = await login(email, password);
+      signIn(session.inversor);
       navigate({ to: "/", replace: true });
     } catch (err) {
       setError((err as Error).message);

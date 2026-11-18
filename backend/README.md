@@ -81,11 +81,17 @@ Las rutas de negocio se publican bajo `/api`:
   inversores que los marcaron. `GET /cuentas/{id}/ganancias-realizadas`
   agrupa el resultado de ventas ejecutadas por año.
 
-Para instalaciones existentes, aplicar una vez
-[`src/db/migrations/001_inversor_password.sql`](src/db/migrations/001_inversor_password.sql).
+Para instalaciones existentes, aplicar en orden las migraciones
+[`001_inversor_password.sql`](src/db/migrations/001_inversor_password.sql) y
+[`002_grupos_dashboard.sql`](src/db/migrations/002_grupos_dashboard.sql).
 La migración conserva los inversores actuales sin asignarles contraseñas.
 Configurar `PASSWORD_FINGERPRINT_SECRET` con un secreto estable y distinto de
 `JWT_SECRET`; si se omite, se deriva del `JWT_SECRET` configurado.
+
+El frontend usa además `POST /api/auth/login` (devuelve `token` e `inversor`) y
+rutas de mercado, cuenta, cartera, órdenes y grupos bajo `/api`. Los aportes
+grupales se debitan del saldo ARS del inversor y se registran en `aporte_grupo`;
+las claves de acceso del grupo se guardan con hash.
 
 ---
 

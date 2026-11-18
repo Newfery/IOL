@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from src.db.connection import get_db
 from src.db.models.user_model import User
+from src.db.models.inversor_model import Inversor
+from src.repositories.inversor_repository import InversorRepository
 from src.repositories.user_repository import UserRepository
 from src.utils.errors import ForbiddenError, UnauthorizedError
 from src.utils.jwt import decode_token
@@ -35,3 +37,22 @@ def get_current_admin(
     if not current_user.is_admin:
         raise ForbiddenError("Se requiere una cuenta de administrador")
     return current_user
+
+
+def get_current_inversor(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Inversor:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise UnauthorizedError("Missing or malformed Authorization header")
+    payload = decode_token(authorization.split(" ", 1)[1].strip())
+    if payload.get("role") != "inversor" or payload.get("sub") is None:
+        raise UnauthorizedError("Invalid token payload")
+    try:
+        inversor_id = int(payload["sub"])
+    except (TypeError, ValueError) as exc:
+        raise UnauthorizedError("Invalid token payload") from exc
+    inversor = InversorRepository(db).get_by_id(inversor_id)
+    if inversor is None:
+        raise UnauthorizedError("Inversor no longer exists")
+    return inversor

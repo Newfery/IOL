@@ -22,3 +22,7 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+For the local API, copy `.env.example` to `.env.local` and run the backend on
+`http://localhost:8000`. Set the backend `CORS_ORIGINS` value if the frontend
+uses a different origin.
