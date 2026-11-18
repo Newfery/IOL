@@ -9,6 +9,7 @@ from src.routers import (
     cuenta_router,
     dividendo_router,
     favoritos_router,
+    grupo_de_inversion_router,
     inversor_router,
     movimiento_router,
     operacion_router,
@@ -35,6 +36,7 @@ app.include_router(dividendo_router.router, prefix="/api")
 app.include_router(movimiento_router.router, prefix="/api")
 app.include_router(tenencia_router.router, prefix="/api")
 app.include_router(favoritos_router.router, prefix="/api")
+app.include_router(grupo_de_inversion_router.router, prefix="/api")
 # TODO: registrar product_router cuando se implemente
 # app.include_router(product_router.router, prefix="/api")
 
