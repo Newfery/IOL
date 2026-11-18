@@ -1,26 +1,33 @@
 from pydantic import BaseModel
+from decimal import Decimal
 
 
-class CreatePasajeroDTO(BaseModel): # POST
-    nombre: str
-    email: str
-    telefono: str
+class CreateTenenciaGrupoDTO(BaseModel): # POST
+    grupo_id: int
+    activo_id: int
+    cantidad: Decimal
+    precio_promedio: Decimal
 
-class UpdatePasajeroDTO(BaseModel): # PUT/PATCH
-    nombre: str | None = None
-    email: str | None = None
-    telefono: str | None = None
 
-class DeletePasajeroDTO(BaseModel): # DELETE
-    id: int
+class UpdateTenenciaGrupoDTO(BaseModel): # PUT/PATCH
+    cantidad: Decimal | None = None
+    precio_promedio: Decimal | None = None
 
-class GetPasajeroDTO(BaseModel): # GET (individual)
-    id: int
 
-class PasajeroResponseDTO(BaseModel):
-    id: int
-    nombre: str
-    email: str
-    telefono: str
+class DeleteTenenciaGrupoDTO(BaseModel): # DELETE
+    grupo_id: int
+    activo_id: int
+
+
+class GetTenenciaGrupoDTO(BaseModel): # GET (individual)
+    grupo_id: int
+    activo_id: int
+
+
+class TenenciaGrupoResponseDTO(BaseModel):
+    grupo_id: int
+    activo_id: int
+    cantidad: Decimal
+    precio_promedio: Decimal
 
     model_config = {"from_attributes": True}
