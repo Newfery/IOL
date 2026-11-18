@@ -124,3 +124,53 @@
         CONSTRAINT fk_favoritos_inversor FOREIGN KEY (inversor_id) REFERENCES inversor(id) ON DELETE CASCADE,
         CONSTRAINT fk_favoritos_activo FOREIGN KEY (activo_id) REFERENCES activo(id) ON DELETE CASCADE
     );
+
+-- Grupo de inversión
+CREATE TABLE grupo_de_inversion (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(255) UNIQUE NOT NULL,
+    codigo_union VARCHAR(50) UNIQUE NOT NULL,
+    creador_id INT NOT NULL,
+    plata_disponible DECIMAL(15, 2) DEFAULT 0.00 NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_grupo_creador
+        FOREIGN KEY (creador_id) REFERENCES inversor(id),
+
+    CONSTRAINT chk_grupo_plata
+        CHECK (plata_disponible >= 0)
+);
+
+-- Integrantes del grupo
+CREATE TABLE grupo_inversor (
+    grupo_id INT NOT NULL,
+    inversor_id INT NOT NULL,
+    fecha_union TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (grupo_id, inversor_id),
+
+    CONSTRAINT fk_grupo_inversor_grupo
+        FOREIGN KEY (grupo_id) REFERENCES grupo_de_inversion(id) ON DELETE CASCADE,
+
+    CONSTRAINT fk_grupo_inversor_inversor
+        FOREIGN KEY (inversor_id) REFERENCES inversor(id) ON DELETE CASCADE
+);
+
+-- Acciones y otros activos que posee el grupo
+CREATE TABLE tenencia_grupo (
+    grupo_id INT NOT NULL,
+    activo_id INT NOT NULL,
+    cantidad DECIMAL(18, 4) NOT NULL,
+    precio_promedio DECIMAL(15, 4) NOT NULL,
+
+    PRIMARY KEY (grupo_id, activo_id),
+
+    CONSTRAINT fk_tenencia_grupo_grupo
+        FOREIGN KEY (grupo_id) REFERENCES grupo_de_inversion(id) ON DELETE CASCADE,
+
+    CONSTRAINT fk_tenencia_grupo_activo
+        FOREIGN KEY (activo_id) REFERENCES activo(id),
+
+    CONSTRAINT chk_tenencia_grupo_cantidad CHECK (cantidad > 0),
+    CONSTRAINT chk_tenencia_grupo_precio CHECK (precio_promedio >= 0)
+);
