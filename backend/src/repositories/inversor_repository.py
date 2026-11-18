@@ -10,12 +10,22 @@ class InversorRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, nombre: str, email: str, cuit: str, perfil_riesgo: str) -> Inversor:
+    def create(
+        self,
+        nombre: str,
+        email: str,
+        cuit: str,
+        perfil_riesgo: str,
+        password_hash: str,
+        password_fingerprint: str,
+    ) -> Inversor:
         inversor = Inversor(
             nombre=nombre,
             email=email,
             cuit=cuit,
-            perfil_riesgo=perfil_riesgo
+            perfil_riesgo=perfil_riesgo,
+            password_hash=password_hash,
+            password_fingerprint=password_fingerprint,
         )
         self.db.add(inversor)
         self.db.flush()
@@ -39,6 +49,15 @@ class InversorRepository:
 
     def get_by_cuit(self, cuit: str) -> Inversor | None:
         return self.db.query(Inversor).filter(Inversor.cuit == cuit).first()
+
+    def get_by_password_fingerprint(
+        self, fingerprint: str
+    ) -> Inversor | None:
+        return (
+            self.db.query(Inversor)
+            .filter(Inversor.password_fingerprint == fingerprint)
+            .first()
+        )
 
     def update(self, inversor: Inversor) -> Inversor:
         self.db.add(inversor)

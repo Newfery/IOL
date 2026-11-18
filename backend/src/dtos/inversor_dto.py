@@ -7,6 +7,7 @@ class CreateInversorDTO(BaseModel): # POST
     email: str
     cuit: str
     perfil_riesgo: str
+    password: str
 
 
 class UpdateInversorDTO(BaseModel): # PUT/PATCH

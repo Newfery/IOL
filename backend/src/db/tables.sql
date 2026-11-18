@@ -5,8 +5,11 @@
         nombre VARCHAR(255) NOT NULL,
         cuit VARCHAR(11) UNIQUE NOT NULL,
         perfil_riesgo VARCHAR(20) NOT NULL,
+        password_hash VARCHAR NOT NULL,
+        password_fingerprint VARCHAR(64) NOT NULL,
         fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         
+        CONSTRAINT uq_inversor_password_fingerprint UNIQUE (password_fingerprint),
         -- HU1: El CUIT debe tener exactamente 11 dígitos numéricos
         CONSTRAINT chk_cuit_length CHECK (cuit ~ '^[0-9]{11}$'),
         -- HU1: Perfiles válidos

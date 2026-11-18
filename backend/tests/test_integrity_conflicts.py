@@ -2,6 +2,7 @@ import unittest
 from decimal import Decimal
 
 from fastapi.routing import APIRoute
+from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -12,14 +13,16 @@ from src.db.models.inversor_model import Inversor
 from src.db.models.tenencia_model import Tenencia
 from src.dtos.activo_dto import UpdateActivoDTO
 from src.dtos.cuenta_dto import UpdateCuentaDTO
-from src.dtos.inversor_dto import UpdateInversorDTO
+from src.dtos.inversor_dto import CreateInversorDTO, UpdateInversorDTO
 from src.dtos.tenencia_dto import CreateTenenciaDTO
 from src.routers.operacion_router import router as operacion_router
 from src.services.activos_service import ActivoService
 from src.services.cuenta_service import CuentaService
 from src.services.inversor_service import InversorService
 from src.services.tenencia_service import TenenciaService
+from src.schemas.inversor_schema import CreateInversorSchema
 from src.utils.errors import ConflictError
+from src.utils.hash import verify_password
 
 
 class IntegrityConflictTests(unittest.TestCase):
@@ -34,6 +37,8 @@ class IntegrityConflictTests(unittest.TestCase):
                 email=f"{suffix}@example.com",
                 cuit=f"2012345678{index}",
                 perfil_riesgo="agresivo",
+                password_hash=f"legacy-hash-{index}",
+                password_fingerprint=f"legacy-fingerprint-{index}",
             )
             for index, suffix in enumerate(("uno", "dos"), start=1)
         ]
@@ -83,6 +88,59 @@ class IntegrityConflictTests(unittest.TestCase):
 
         actual = self.db.get(Inversor, self.inversores[0].id)
         self.assertEqual(actual.email, "uno@example.com")
+
+    def test_password_de_inversor_es_bcrypt_y_no_se_puede_reutilizar(self):
+        service = InversorService(self.db)
+        primer_inversor = service.create(
+            CreateInversorDTO(
+                nombre="Primero",
+                email="primero@example.com",
+                cuit="30123456780",
+                perfil_riesgo="moderado",
+                password="clave-unica-segura",
+            )
+        )
+        guardado = self.db.get(Inversor, primer_inversor.id)
+
+        self.assertTrue(guardado.password_hash.startswith("$2"))
+        self.assertTrue(verify_password("clave-unica-segura", guardado.password_hash))
+        self.assertNotIn("password_hash", primer_inversor.model_dump())
+        self.assertNotIn("password_fingerprint", primer_inversor.model_dump())
+
+        with self.assertRaises(ConflictError):
+            service.create(
+                CreateInversorDTO(
+                    nombre="Segundo",
+                    email="segundo@example.com",
+                    cuit="30123456781",
+                    perfil_riesgo="moderado",
+                    password="clave-unica-segura",
+                )
+            )
+
+        segundo_inversor = service.create(
+            CreateInversorDTO(
+                nombre="Segundo",
+                email="segundo@example.com",
+                cuit="30123456781",
+                perfil_riesgo="moderado",
+                password="otra-clave-segura",
+            )
+        )
+        self.assertNotEqual(primer_inversor.id, segundo_inversor.id)
+
+    def test_alta_inversor_requiere_password_y_limita_bytes_bcrypt(self):
+        datos = {
+            "nombre": "Nuevo",
+            "email": "nuevo@example.com",
+            "cuit": "30123456780",
+            "perfil_riesgo": "moderado",
+        }
+        with self.assertRaises(ValidationError):
+            CreateInversorSchema(**datos)
+
+        with self.assertRaises(ValidationError):
+            CreateInversorSchema(**datos, password="á" * 37)
 
     def test_ticker_duplicado_devuelve_conflicto(self):
         with self.assertRaises(ConflictError):
