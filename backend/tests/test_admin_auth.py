@@ -1,5 +1,6 @@
 import unittest
 
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -40,7 +41,10 @@ class AdminAuthTests(unittest.TestCase):
 
         current_admin = get_current_admin(
             current_user=get_current_user(
-                authorization=f"Bearer {login.token}",
+                credentials=HTTPAuthorizationCredentials(
+                    scheme="Bearer",
+                    credentials=login.token,
+                ),
                 db=self.db,
             )
         )
@@ -55,9 +59,16 @@ class AdminAuthTests(unittest.TestCase):
 
         with self.assertRaises(ForbiddenError):
             get_current_user(
-                authorization=f"Bearer {investor_token}",
+                credentials=HTTPAuthorizationCredentials(
+                    scheme="Bearer",
+                    credentials=investor_token,
+                ),
                 db=self.db,
             )
+
+    def test_missing_bearer_token_is_unauthorized(self):
+        with self.assertRaises(UnauthorizedError):
+            get_current_user(credentials=None, db=self.db)
 
     def test_non_admin_cannot_login_through_admin_endpoint(self):
         self.admin.is_admin = False

@@ -1,4 +1,5 @@
-from fastapi import Depends, Header
+from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from src.db.connection import get_db
@@ -9,16 +10,17 @@ from src.repositories.user_repository import UserRepository
 from src.utils.errors import ForbiddenError, UnauthorizedError
 from src.utils.jwt import decode_token
 
+bearer_scheme = HTTPBearer(auto_error=False)
+
 
 def get_current_user(
-    authorization: str | None = Header(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    if not authorization or not authorization.lower().startswith("bearer "):
+    if credentials is None:
         raise UnauthorizedError("Missing or malformed Authorization header")
 
-    token = authorization.split(" ", 1)[1].strip()
-    payload = decode_token(token)
+    payload = decode_token(credentials.credentials)
 
     if payload.get("role") != "admin":
         raise ForbiddenError("Se requiere una cuenta de administrador")
@@ -46,12 +48,12 @@ def get_current_admin(
 
 
 def get_current_inversor(
-    authorization: str | None = Header(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> Inversor:
-    if not authorization or not authorization.lower().startswith("bearer "):
+    if credentials is None:
         raise UnauthorizedError("Missing or malformed Authorization header")
-    payload = decode_token(authorization.split(" ", 1)[1].strip())
+    payload = decode_token(credentials.credentials)
     if payload.get("role") != "inversor" or payload.get("sub") is None:
         raise UnauthorizedError("Invalid token payload")
     try:

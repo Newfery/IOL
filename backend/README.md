@@ -98,7 +98,8 @@ Las rutas de negocio se publican bajo `/api`:
 Para instalaciones existentes, aplicar en orden las migraciones
 [`001_inversor_password.sql`](src/db/migrations/001_inversor_password.sql),
 [`002_grupos_dashboard.sql`](src/db/migrations/002_grupos_dashboard.sql) y
-[`003_operacion_liquidacion.sql`](src/db/migrations/003_operacion_liquidacion.sql).
+[`003_operacion_liquidacion.sql`](src/db/migrations/003_operacion_liquidacion.sql),
+[`004_users.sql`](src/db/migrations/004_users.sql).
 La migración conserva los inversores actuales sin asignarles contraseñas.
 Configurar `PASSWORD_FINGERPRINT_SECRET` con un secreto estable y distinto de
 `JWT_SECRET`; si se omite, se deriva del `JWT_SECRET` configurado.
@@ -112,7 +113,11 @@ Las operaciones administrativas, como `POST /api/dividendos/`, requieren un
 token de administrador obtenido con `POST /api/auth/admin/login` usando una
 cuenta de `users` provisionada con `is_admin=true`. El login de inversor no
 autoriza operaciones administrativas; las cuentas de administrador no se crean
-desde el registro público.
+desde el registro público. Después de aplicar la migración 004, crear la
+primera cuenta administrativa desde `backend/` con
+`python -m src.db.seeders.create_admin`. Luego iniciar sesión en
+`/api/auth/admin/login`, copiar el token y usar **Authorize** en Swagger antes
+de ejecutar `POST /api/dividendos/`.
 
 Las ventas ejecutadas acreditan el efectivo después del plazo del activo:
 acciones y CEDEARs a 24 horas, bonos a 48. Hasta su vencimiento aparecen en
