@@ -37,6 +37,8 @@ exit /b
 :run_frontend
 cd /d "%~dp0frontend"
 set "VITE_API_URL=http://localhost:8000"
+set "PORTABLE_NODE=%~dp0.local-node\node-v26.13.1-win-x64"
+if exist "%PORTABLE_NODE%\node.exe" set "PATH=%PORTABLE_NODE%;%PATH%"
 if exist "node_modules\.bin\vite.cmd" (
   npm run dev
 ) else (
