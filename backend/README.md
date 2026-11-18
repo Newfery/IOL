@@ -58,9 +58,10 @@ No requiere una API key ni modifica el precio guardado en la base de datos.
 
 Las rutas de negocio se publican bajo `/api`:
 
-- `POST /inversores`: da de alta al inversor y crea automáticamente una cuenta
-  comitente con ambos saldos en cero. `PATCH /inversores/{id}/perfil` cambia
-  su perfil de riesgo.
+- `POST /inversores`: recibe una contraseña obligatoria (mínimo 8 caracteres,
+  máximo 72 bytes), la guarda con bcrypt y no permite reutilizarla entre
+  inversores. El alta crea automáticamente una cuenta comitente con ambos
+  saldos en cero. `PATCH /inversores/{id}/perfil` cambia su perfil de riesgo.
 - `GET /activos?tipo=...&moneda=...` filtra el catálogo;
   `PATCH /activos/{id}/precio` actualiza el precio vigente.
 - `POST /movimientos` registra depósitos y extracciones y actualiza el saldo
@@ -79,6 +80,12 @@ Las rutas de negocio se publican bajo `/api`:
   últimos siete días; `GET /activos/mas-favoritos` ordena por cantidad de
   inversores que los marcaron. `GET /cuentas/{id}/ganancias-realizadas`
   agrupa el resultado de ventas ejecutadas por año.
+
+Para instalaciones existentes, aplicar una vez
+[`src/db/migrations/001_inversor_password.sql`](src/db/migrations/001_inversor_password.sql).
+La migración conserva los inversores actuales sin asignarles contraseñas.
+Configurar `PASSWORD_FINGERPRINT_SECRET` con un secreto estable y distinto de
+`JWT_SECRET`; si se omite, se deriva del `JWT_SECRET` configurado.
 
 ---
 

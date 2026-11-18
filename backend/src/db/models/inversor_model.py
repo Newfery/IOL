@@ -1,6 +1,13 @@
 from datetime import date
 
-from sqlalchemy import CheckConstraint, Column, Date, Integer, String
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Date,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 
 from src.db.connection import Base
@@ -16,6 +23,8 @@ class Inversor(Base):
     nombre = Column(String, nullable=False)
     cuit = Column(String(11), unique=True, nullable=False)
     perfil_riesgo = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)
+    password_fingerprint = Column(String(64), nullable=False)
     fecha_alta = Column(Date, default=date.today)
     favoritos = relationship(
         Activo,
@@ -24,6 +33,10 @@ class Inversor(Base):
     )
 
     __table_args__ = (
+        UniqueConstraint(
+            "password_fingerprint",
+            name="uq_inversor_password_fingerprint",
+        ),
         CheckConstraint(
             "length(cuit) = 11 AND cuit NOT GLOB '*[^0-9]*'"
         ),

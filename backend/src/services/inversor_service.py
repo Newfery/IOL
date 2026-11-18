@@ -5,6 +5,7 @@ from src.dtos.inversor_dto import CreateInversorDTO, UpdateInversorDTO, Inversor
 from src.mappers.inversor_mapper import to_inversor_response
 from src.repositories.inversor_repository import InversorRepository
 from src.utils.errors import ConflictError
+from src.utils.hash import hash_password, password_fingerprint
 from src.utils.integrity_errors import is_unique_violation
 
 
@@ -17,16 +18,25 @@ class InversorService:
             raise ConflictError("Este email ya está en uso")
         if self.repo.get_by_cuit(dto.cuit) is not None:
             raise ConflictError("Este CUIT ya está en uso")
+        fingerprint = password_fingerprint(dto.password)
+        if self.repo.get_by_password_fingerprint(fingerprint) is not None:
+            raise ConflictError("Esta contraseña ya está en uso")
         try:
             inversor = self.repo.create(
                 nombre=dto.nombre,
                 email=dto.email,
                 cuit=dto.cuit,
-                perfil_riesgo=dto.perfil_riesgo
+                perfil_riesgo=dto.perfil_riesgo,
+                password_hash=hash_password(dto.password),
+                password_fingerprint=fingerprint,
             )
         except IntegrityError as exc:
             self.repo.db.rollback()
             if is_unique_violation(exc):
+                if self.repo.get_by_password_fingerprint(fingerprint) is not None:
+                    raise ConflictError(
+                        "Esta contraseña ya está en uso"
+                    ) from exc
                 raise ConflictError("El email o CUIT ya está en uso") from exc
             raise
         return to_inversor_response(inversor)

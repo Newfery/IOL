@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class CreateInversorSchema(BaseModel):
@@ -6,6 +6,14 @@ class CreateInversorSchema(BaseModel):
     email: EmailStr
     cuit: str = Field(min_length=11, max_length=11, pattern=r"^[0-9]{11}$")
     perfil_riesgo: str = Field(pattern=r"^(conservador|moderado|agresivo)$")
+    password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_byte_length(cls, password: str) -> str:
+        if len(password.encode("utf-8")) > 72:
+            raise ValueError("La contraseña no puede superar los 72 bytes")
+        return password
 
 
 class UpdateInversorSchema(BaseModel):

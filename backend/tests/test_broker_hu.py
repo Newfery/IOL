@@ -40,6 +40,7 @@ class BrokerHUIntegrationTests(unittest.TestCase):
                 email="demo@example.com",
                 cuit="20123456789",
                 perfil_riesgo=perfil,
+                password="clave-demo-segura",
             )
         )
         inversor_id = int(str(inversor.id))
