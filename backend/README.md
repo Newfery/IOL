@@ -108,6 +108,12 @@ rutas de mercado, cuenta, cartera, órdenes y grupos bajo `/api`. Los aportes
 grupales se debitan del saldo ARS del inversor y se registran en `aporte_grupo`;
 las claves de acceso del grupo se guardan con hash.
 
+Las operaciones administrativas, como `POST /api/dividendos/`, requieren un
+token de administrador obtenido con `POST /api/auth/admin/login` usando una
+cuenta de `users` provisionada con `is_admin=true`. El login de inversor no
+autoriza operaciones administrativas; las cuentas de administrador no se crean
+desde el registro público.
+
 Las ventas ejecutadas acreditan el efectivo después del plazo del activo:
 acciones y CEDEARs a 24 horas, bonos a 48. Hasta su vencimiento aparecen en
 `GET /api/cuenta/plazos` y no se pueden usar para nuevas compras o aportes. El

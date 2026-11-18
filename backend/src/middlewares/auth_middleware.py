@@ -20,11 +20,17 @@ def get_current_user(
     token = authorization.split(" ", 1)[1].strip()
     payload = decode_token(token)
 
+    if payload.get("role") != "admin":
+        raise ForbiddenError("Se requiere una cuenta de administrador")
+
     user_id = payload.get("sub")
     if user_id is None:
         raise UnauthorizedError("Invalid token payload")
 
-    user = UserRepository(db).find_by_id(int(user_id))
+    try:
+        user = UserRepository(db).find_by_id(int(user_id))
+    except (TypeError, ValueError) as exc:
+        raise UnauthorizedError("Invalid token payload") from exc
     if user is None:
         raise UnauthorizedError("User no longer exists")
 
