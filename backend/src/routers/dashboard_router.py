@@ -90,12 +90,19 @@ def market_dolar(db: Session = Depends(get_db)):
     by_ticker = {a.ticker: Decimal(str(a.precio_actual)) for a in db.query(Activo).filter(
         Activo.ticker.in_(["AL30", "AL30D", "GD30", "GD30C"]), Activo.activo.is_(True)
     ).all()}
-    mep = by_ticker.get("AL30") and by_ticker.get("AL30D")
-    ccl = by_ticker.get("GD30") and by_ticker.get("GD30C")
-    if not mep or not ccl:
-        raise NotFoundError("No están cargados los bonos necesarios para calcular MEP y CCL")
-    return {"mep": float(by_ticker["AL30"] / by_ticker["AL30D"]),
-            "ccl": float(by_ticker["GD30"] / by_ticker["GD30C"])}
+    def rate(local_a: str, local_b: str) -> float:
+        price_a, price_b = by_ticker.get(local_a), by_ticker.get(local_b)
+        if price_a is None or price_b is None:
+            try:
+                price_a = CotizacionService.obtener(f"{local_a}.BA").precio
+                price_b = CotizacionService.obtener(f"{local_b}.BA").precio
+            except Exception as exc:
+                raise HTTPException(status_code=502, detail=f"No se pudo calcular la cotización {local_a}/{local_b}") from exc
+        if price_b <= 0:
+            raise HTTPException(status_code=502, detail=f"Precio inválido para {local_b}")
+        return float(price_a / price_b)
+
+    return {"mep": rate("AL30", "AL30D"), "ccl": rate("GD30", "GD30C")}
 
 
 @router.get("/inversores/{inversor_id}/cuenta")
@@ -106,6 +113,7 @@ def account_for_inversor(inversor_id: int, db: Session = Depends(get_db),
     account = db.query(Cuenta).filter(Cuenta.inversor_id == inversor_id).first()
     if account is None:
         raise NotFoundError("Cuenta no encontrada")
+    OperacionService.acreditar_liquidaciones_vencidas(db, account)
     return account
 
 
@@ -114,6 +122,7 @@ def account_balance(db: Session = Depends(get_db), current: Inversor = Depends(g
     account = db.query(Cuenta).filter(Cuenta.inversor_id == current.id).first()
     if account is None:
         raise NotFoundError("Cuenta no encontrada")
+    OperacionService.acreditar_liquidaciones_vencidas(db, account)
     return {"ars": float(account.saldo_ars), "usd": float(account.saldo_usd)}
 
 
@@ -122,19 +131,24 @@ def account_plazos(db: Session = Depends(get_db), current: Inversor = Depends(ge
     account = db.query(Cuenta).filter(Cuenta.inversor_id == current.id).first()
     if account is None:
         raise NotFoundError("Cuenta no encontrada")
-    pending = db.query(Operacion).filter(Operacion.cuenta_id == account.id,
-        Operacion.estado == "pendiente").all()
-    committed = {"ARS": Decimal("0"), "USD": Decimal("0")}
-    for op in pending:
-        asset = db.query(Activo).filter(Activo.id == op.activo_id).first()
-        if asset:
-            committed[str(asset.moneda)] += Decimal(str(op.total))
+    OperacionService.acreditar_liquidaciones_vencidas(db, account)
+    settling = db.query(Operacion, Activo).join(Activo, Activo.id == Operacion.activo_id).filter(
+        Operacion.cuenta_id == account.id,
+        Operacion.tipo == "venta",
+        Operacion.estado == "ejecutada",
+        Operacion.liquidacion_acreditada.is_(False),
+    ).all()
+    due = {1: {"ARS": 0.0, "USD": 0.0}, 2: {"ARS": 0.0, "USD": 0.0}}
+    for operation, asset in settling:
+        bucket = min(max(operation.liquidacion_dias, 1), 2)
+        due[bucket][str(asset.moneda)] += float(operation.total)
     return [
         {"label": "Disponible para operar", "detalle": "Liquidación inmediata",
-         "ars": max(0, float(account.saldo_ars) - float(committed["ARS"])),
-         "usd": max(0, float(account.saldo_usd) - float(committed["USD"]))},
-        {"label": "En liquidación (24 hs)", "detalle": "Operaciones con liquidación a 24 hs", "ars": 0, "usd": 0},
-        {"label": "En liquidación (48 hs)", "detalle": "Operaciones con liquidación a 48 hs", "ars": 0, "usd": 0},
+         "ars": float(account.saldo_ars), "usd": float(account.saldo_usd)},
+        {"label": "En liquidación (24 hs)", "detalle": "Ventas de acciones y CEDEARs",
+         "ars": due[1]["ARS"], "usd": due[1]["USD"]},
+        {"label": "En liquidación (48 hs)", "detalle": "Ventas de bonos",
+         "ars": due[2]["ARS"], "usd": due[2]["USD"]},
     ]
 
 
@@ -143,11 +157,25 @@ def pending_orders(db: Session = Depends(get_db), current: Inversor = Depends(ge
     account = db.query(Cuenta).filter(Cuenta.inversor_id == current.id).first()
     if account is None:
         raise NotFoundError("Cuenta no encontrada")
+    OperacionService.acreditar_liquidaciones_vencidas(db, account)
     rows = db.query(Operacion, Activo).join(Activo, Activo.id == Operacion.activo_id).filter(
         Operacion.cuenta_id == account.id, Operacion.estado == "pendiente").all()
-    return [{"desc": f"{op.tipo.title()} {asset.ticker} x{op.cantidad}",
-             "ars": float(op.total) if asset.moneda == "ARS" else 0,
-             "usd": float(op.total) if asset.moneda == "USD" else 0} for op, asset in rows]
+    result = [{"desc": f"{op.tipo.title()} {asset.ticker} x{op.cantidad}",
+               "ars": float(op.total) if asset.moneda == "ARS" else 0,
+               "usd": float(op.total) if asset.moneda == "USD" else 0} for op, asset in rows]
+    sales_to_settle = db.query(Operacion, Activo).join(Activo, Activo.id == Operacion.activo_id).filter(
+        Operacion.cuenta_id == account.id,
+        Operacion.tipo == "venta",
+        Operacion.estado == "ejecutada",
+        Operacion.liquidacion_acreditada.is_(False),
+    ).all()
+    for operation, asset in sales_to_settle:
+        result.append({
+            "desc": f"Venta {asset.ticker} x{operation.cantidad} (liquidación {operation.liquidacion_dias * 24} hs)",
+            "ars": float(operation.total) if asset.moneda == "ARS" else 0,
+            "usd": float(operation.total) if asset.moneda == "USD" else 0,
+        })
+    return result
 
 
 @router.get("/portfolio")
@@ -220,6 +248,8 @@ def contribute_group(group_id: int, payload: GroupContributionRequest, db: Sessi
     if group is None: raise NotFoundError("Grupo no encontrado")
     if membership is None: raise HTTPException(status_code=403, detail="No pertenecés al grupo")
     if amount <= 0: raise HTTPException(status_code=422, detail="El aporte debe ser mayor a cero")
+    if account is not None:
+        OperacionService.acreditar_liquidaciones_vencidas(db, account)
     if account is None or Decimal(str(account.saldo_ars)) < amount:
         raise HTTPException(status_code=400, detail="Saldo ARS insuficiente para aportar")
     try:

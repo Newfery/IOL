@@ -1,5 +1,5 @@
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
@@ -18,6 +18,35 @@ class OperacionService:
     @staticmethod
     def _dinero(monto: Decimal) -> Decimal:
         return monto.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @staticmethod
+    def dias_liquidacion(activo: Activo) -> int:
+        # Bonos acreditan en 48 horas; acciones y CEDEARs en 24 horas.
+        return 2 if str(activo.tipo) == "bono" else 1
+
+    @staticmethod
+    def acreditar_liquidaciones_vencidas(db: Session, cuenta: Cuenta) -> None:
+        now = datetime.now()
+        pending = (
+            db.query(Operacion, Activo)
+            .join(Activo, Activo.id == Operacion.activo_id)
+            .filter(
+                Operacion.cuenta_id == cuenta.id,
+                Operacion.tipo == "venta",
+                Operacion.estado == "ejecutada",
+                Operacion.liquidacion_acreditada.is_(False),
+                Operacion.fecha_liquidacion <= now,
+            )
+            .with_for_update()
+            .all()
+        )
+        for operation, asset in pending:
+            currency = str(asset.moneda)
+            current = Decimal(str(OperacionService.obtener_saldo(cuenta, currency)))
+            OperacionService.actualizar_saldo(cuenta, currency, current + Decimal(str(operation.total)))
+            operation.liquidacion_acreditada = True
+        if pending:
+            db.commit()
 
     @staticmethod
     def historial(
@@ -137,6 +166,8 @@ class OperacionService:
                 status_code=404,
                 detail="Cuenta no encontrada"
             )
+
+        OperacionService.acreditar_liquidaciones_vencidas(db, cuenta)
 
         # Busca el activo
         activo = db.query(Activo).filter(
@@ -270,6 +301,8 @@ class OperacionService:
                 detail="Cuenta no encontrada"
             )
 
+        OperacionService.acreditar_liquidaciones_vencidas(db, cuenta)
+
         # Busca el activo
         activo = db.query(Activo).filter(
             Activo.id == activo_id
@@ -323,17 +356,15 @@ class OperacionService:
         )
 
         try:
-            # Acredita el dinero en la cuenta
             moneda = str(activo.moneda)
             saldo = Decimal(str(
                 OperacionService.obtener_saldo(cuenta, moneda)
             ))
-
-            OperacionService.actualizar_saldo(
-                cuenta,
-                moneda,
-                saldo + total
-            )
+            dias_liquidacion = OperacionService.dias_liquidacion(activo)
+            fecha_liquidacion = datetime.now() + timedelta(hours=24 * dias_liquidacion)
+            liquidacion_acreditada = dias_liquidacion == 0
+            if liquidacion_acreditada:
+                OperacionService.actualizar_saldo(cuenta, moneda, saldo + total)
 
             # Actualiza la cantidad de unidades
             nueva_cantidad = Decimal(str(tenencia.cantidad)) - cantidad
@@ -355,7 +386,10 @@ class OperacionService:
                 comision=comision,
                 total=total,
                 resultado_realizado=resultado,
-                estado="ejecutada"
+                estado="ejecutada",
+                liquidacion_dias=dias_liquidacion,
+                liquidacion_acreditada=liquidacion_acreditada,
+                fecha_liquidacion=fecha_liquidacion,
             )
 
             db.add(operacion)
@@ -387,6 +421,8 @@ class OperacionService:
         )
         if cuenta is None:
             raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+
+        OperacionService.acreditar_liquidaciones_vencidas(db, cuenta)
 
         al30 = db.query(Activo).filter(Activo.ticker == "AL30").first()
         al30d = db.query(Activo).filter(Activo.ticker == "AL30D").first()

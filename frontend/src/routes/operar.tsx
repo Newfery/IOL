@@ -3,12 +3,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppHeader } from "@/components/AppHeader";
 import { useEffect, useState } from "react";
 import { TrendingUp, Globe, Landmark, PieChart, Search, Star, X, type LucideIcon } from "lucide-react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   getAssets,
+  getHistory,
   getPortfolio,
   placeOrder,
   type Asset,
   type Holding,
+  type HistoryPoint,
 } from "@/lib/api";
 
 export const Route = createFileRoute("/operar")({
@@ -52,6 +55,7 @@ function Index() {
   const qty = Math.max(0, Math.floor(Number(qtyText) || 0));
   const [err, setErr] = useState(false);
   const [msg, setMsg] = useState("");
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
 
   useEffect(() => {
     getAssets().then(setAssets);
@@ -60,6 +64,11 @@ function Index() {
       setFavorites(JSON.parse(localStorage.getItem("invertix_favoritos") ?? "[]"));
     } catch { /* sin favoritos guardados */ }
   }, []);
+
+  useEffect(() => {
+    if (!selected) { setHistory([]); return; }
+    getHistory(selected.symbol).then(setHistory).catch(() => setHistory([]));
+  }, [selected]);
 
   function toggleFavorite(symbol: string) {
     setFavorites((prev) => {
@@ -268,6 +277,19 @@ function Index() {
                 Vender
               </button>
             </div>
+            {history.length > 0 && (
+              <div className="mt-4 h-40 rounded-lg bg-background p-2" aria-label={`Historial de precio de ${selected.symbol}`}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={history}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="date" hide />
+                    <YAxis domain={["auto", "auto"]} width={60} tick={{ fontSize: 10 }} />
+                    <Tooltip formatter={(value: number) => fmt(value)} labelFormatter={(label) => String(label)} />
+                    <Line type="monotone" dataKey="price" stroke="var(--primary)" dot={false} strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
             <label className="mt-4 block text-xs text-muted-foreground">Cantidad</label>
             <input
               type="number"

@@ -4,7 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/lib/auth";
-import { getCuenta, getDolarQuotes, getPlazos, getOrdenesPendientes, type Cuenta } from "@/lib/api";
+import { getBalance, getDolarQuotes, getPlazos, getOrdenesPendientes } from "@/lib/api";
 
 export const Route = createFileRoute("/mi-dinero")({
   head: () => ({
@@ -30,7 +30,7 @@ const usd = (n: number) => `US$ ${n.toLocaleString("es-AR", { maximumFractionDig
 
 function MiDinero() {
   const { user } = useAuth();
-  const [cuenta, setCuenta] = useState<Cuenta | null>(null);
+  const [balance, setBalance] = useState<{ ars: number; usd: number } | null>(null);
   const [quotes, setQuotes] = useState({ mep: 0, ccl: 0 });
   const [moneda, setMoneda] = useState<Moneda>("ARS");
   const [oculto, setOculto] = useState(false);
@@ -40,19 +40,19 @@ function MiDinero() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.allSettled([getCuenta(user.id), getDolarQuotes(), getPlazos(), getOrdenesPendientes()])
-      .then(([c, q, p, o]) => {
-        if (c.status === "fulfilled") setCuenta(c.value);
+    Promise.allSettled([getBalance(), getDolarQuotes(), getPlazos(), getOrdenesPendientes()])
+      .then(([b, q, p, o]) => {
+        if (b.status === "fulfilled") setBalance(b.value);
         if (q.status === "fulfilled") setQuotes(q.value);
         if (p.status === "fulfilled") setPlazos(p.value);
         if (o.status === "fulfilled") setPendientes(o.value);
-        const failed = [c, q, p, o].find((result) => result.status === "rejected");
+        const failed = [b, q, p, o].find((result) => result.status === "rejected");
         if (failed?.status === "rejected") setError((failed.reason as Error).message);
       });
   }, [user]);
 
-  const totalArs = cuenta ? cuenta.saldo_ars : 0;
-  const totalUsd = cuenta ? cuenta.saldo_usd : 0;
+  const totalArs = balance?.ars ?? 0;
+  const totalUsd = balance?.usd ?? 0;
   const fmt = (n: number) => (moneda === "ARS" ? ars(n) : usd(n));
   const monto = (a: number, u: number) => (moneda === "ARS" ? a : u);
   const ocultar = (s: string) => (oculto ? s.replace(/[0-9]/g, "*") : s);
@@ -81,9 +81,9 @@ function MiDinero() {
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Tu disponible total</p>
               <p className="mt-2 font-display text-4xl font-semibold">
-                {cuenta ? ocultar(fmt(moneda === "ARS" ? totalArs : totalUsd)) : "—"}
+                {balance ? ocultar(fmt(moneda === "ARS" ? totalArs : totalUsd)) : "—"}
               </p>
-              {moneda === "ARS" && cuenta && quotes.mep > 0 && (
+              {moneda === "ARS" && balance && quotes.mep > 0 && (
                 <p className="mt-1 text-sm text-muted-foreground">≈ {ocultar(usd(totalArs / quotes.mep))} al MEP</p>
               )}
             </div>
@@ -107,7 +107,7 @@ function MiDinero() {
                     <p className="text-sm font-semibold">{p.label}</p>
                     <p className="text-xs text-muted-foreground">{p.detalle}</p>
                   </div>
-                  <p className="font-mono text-sm">{cuenta ? ocultar(fmt(m)) : "—"}</p>
+                  <p className="font-mono text-sm">{balance ? ocultar(fmt(m)) : "—"}</p>
                 </li>
               );
             })}

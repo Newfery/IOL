@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, ForeignKey, CheckConstraint
+from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, ForeignKey, CheckConstraint, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -18,6 +18,9 @@ class Operacion(Base):
     resultado_realizado = Column(DECIMAL(15, 2), nullable=True)
     fecha = Column(DateTime, server_default=func.now())
     estado = Column(String(20), nullable=False)
+    liquidacion_dias = Column(Integer, nullable=False, default=0, server_default="0")
+    liquidacion_acreditada = Column(Boolean, nullable=False, default=True, server_default="true")
+    fecha_liquidacion = Column(DateTime, nullable=True)
 
     cuenta = relationship("Cuenta")
     activo = relationship("Activo")
@@ -44,4 +47,5 @@ class Operacion(Base):
             "estado IN ('pendiente', 'ejecutada', 'rechazada')",
             name="chk_operacion_estado"
         ),
+        CheckConstraint("liquidacion_dias BETWEEN 0 AND 2", name="chk_operacion_liquidacion_dias"),
     )

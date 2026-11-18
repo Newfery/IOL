@@ -22,6 +22,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export type Asset = { symbol: string; name: string; price: number; change: number; type: "Acción" | "CEDEAR" | "Bono" | "FCI" };
 export type Holding = { symbol: string; qty: number; avgPrice: number };
 export type Order = { symbol: string; side: "buy" | "sell"; qty: number; price: number };
+export type HistoryPoint = { date: string; price: number };
 export type PerfilRiesgo = "conservador" | "moderado" | "agresivo";
 export type Inversor = { id: number; email: string; nombre: string; cuit: string; perfil_riesgo: PerfilRiesgo; fecha_alta: string };
 export type Cuenta = { id: number; inversor_id: number; numero_comitente: string; saldo_ars: number; saldo_usd: number };
@@ -40,7 +41,7 @@ export async function login(email: string, password: string): Promise<{ token: s
 
 export async function getCuenta(inversorId: number): Promise<Cuenta> { return request(`/api/inversores/${inversorId}/cuenta`); }
 export async function getAssets(): Promise<Asset[]> { return request("/api/market/assets"); }
-export async function getHistory(symbol: string): Promise<unknown> { return request(`/api/market/assets/${encodeURIComponent(symbol)}/history`); }
+export async function getHistory(symbol: string): Promise<HistoryPoint[]> { return request(`/api/market/assets/${encodeURIComponent(symbol)}/history`); }
 export async function getDolarQuotes(): Promise<{ mep: number; ccl: number }> { return request("/api/market/dolar"); }
 export async function getBalance(): Promise<{ ars: number; usd: number }> { return request("/api/account/balance"); }
 export async function getPlazos(): Promise<Array<{ label: string; detalle: string; ars: number; usd: number }>> { return request("/api/cuenta/plazos"); }

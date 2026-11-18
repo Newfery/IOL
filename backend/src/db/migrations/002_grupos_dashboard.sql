@@ -1,6 +1,6 @@
-ALTER TABLE grupo_de_inversion ADD COLUMN password_hash VARCHAR(255);
+ALTER TABLE grupo_de_inversion ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
 
-CREATE TABLE aporte_grupo (
+CREATE TABLE IF NOT EXISTS aporte_grupo (
     id SERIAL PRIMARY KEY,
     grupo_id INT NOT NULL REFERENCES grupo_de_inversion(id) ON DELETE CASCADE,
     inversor_id INT NOT NULL REFERENCES inversor(id) ON DELETE CASCADE,
@@ -8,4 +8,4 @@ CREATE TABLE aporte_grupo (
     fecha TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX ix_aporte_grupo_grupo_inversor ON aporte_grupo (grupo_id, inversor_id);
+CREATE INDEX IF NOT EXISTS ix_aporte_grupo_grupo_inversor ON aporte_grupo (grupo_id, inversor_id);

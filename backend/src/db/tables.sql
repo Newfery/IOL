@@ -62,6 +62,9 @@
         resultado_realizado DECIMAL(15, 2), -- HU6: Para guardar ganancia/pérdida en ventas
         fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         estado VARCHAR(20) NOT NULL,
+        liquidacion_dias INT NOT NULL DEFAULT 0 CHECK (liquidacion_dias BETWEEN 0 AND 2),
+        liquidacion_acreditada BOOLEAN NOT NULL DEFAULT TRUE,
+        fecha_liquidacion TIMESTAMP NULL,
         
         CONSTRAINT fk_operacion_cuenta FOREIGN KEY (cuenta_id) REFERENCES cuenta(id),
         CONSTRAINT fk_operacion_activo FOREIGN KEY (activo_id) REFERENCES activo(id),

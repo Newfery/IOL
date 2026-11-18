@@ -54,6 +54,20 @@ GET http://localhost:8000/api/activos/cotizacion/GGAL.BA
 Devuelve el último cierre, el cierre anterior, la variación porcentual y la fecha.
 No requiere una API key ni modifica el precio guardado en la base de datos.
 
+### Cargar acciones y CEDEARs en el catálogo
+
+`/api/market/assets` muestra únicamente los registros que ya existen en la tabla
+`activo`. Para validar y cargar una lista amplia de acciones argentinas y
+CEDEARs compatibles con Yahoo Finance, ejecutar desde `backend/`:
+
+```powershell
+python -m src.db.seeders.yfinance_assets
+```
+
+El sincronizador consulta precios recientes, omite símbolos sin cotización,
+inserta los nuevos y actualiza los existentes sin borrar activos ni tenencias.
+Volvé a ejecutarlo para refrescar el catálogo y los precios.
+
 ## Funcionalidades del broker
 
 Las rutas de negocio se publican bajo `/api`:
@@ -82,8 +96,9 @@ Las rutas de negocio se publican bajo `/api`:
   agrupa el resultado de ventas ejecutadas por año.
 
 Para instalaciones existentes, aplicar en orden las migraciones
-[`001_inversor_password.sql`](src/db/migrations/001_inversor_password.sql) y
-[`002_grupos_dashboard.sql`](src/db/migrations/002_grupos_dashboard.sql).
+[`001_inversor_password.sql`](src/db/migrations/001_inversor_password.sql),
+[`002_grupos_dashboard.sql`](src/db/migrations/002_grupos_dashboard.sql) y
+[`003_operacion_liquidacion.sql`](src/db/migrations/003_operacion_liquidacion.sql).
 La migración conserva los inversores actuales sin asignarles contraseñas.
 Configurar `PASSWORD_FINGERPRINT_SECRET` con un secreto estable y distinto de
 `JWT_SECRET`; si se omite, se deriva del `JWT_SECRET` configurado.
@@ -92,6 +107,12 @@ El frontend usa además `POST /api/auth/login` (devuelve `token` e `inversor`) y
 rutas de mercado, cuenta, cartera, órdenes y grupos bajo `/api`. Los aportes
 grupales se debitan del saldo ARS del inversor y se registran en `aporte_grupo`;
 las claves de acceso del grupo se guardan con hash.
+
+Las ventas ejecutadas acreditan el efectivo después del plazo del activo:
+acciones y CEDEARs a 24 horas, bonos a 48. Hasta su vencimiento aparecen en
+`GET /api/cuenta/plazos` y no se pueden usar para nuevas compras o aportes. El
+backend las acredita automáticamente cuando el inversor consulta saldo, cuenta,
+plazos o inicia una operación.
 
 ---
 

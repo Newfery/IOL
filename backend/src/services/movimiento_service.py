@@ -9,6 +9,7 @@ from src.dtos.movimiento_dto import (
 )
 from src.mappers.movimiento_mapper import to_movimiento_response
 from src.repositories.movimiento_repository import MovimientoRepository
+from src.services.operacion_service import OperacionService
 from src.utils.errors import BadRequestError, ConflictError, NotFoundError
 
 
@@ -28,6 +29,7 @@ class MovimientoService:
         cuenta = self.repo.get_cuenta_for_update(dto.cuenta_id)
         if cuenta is None:
             raise NotFoundError("Cuenta no encontrada")
+        OperacionService.acreditar_liquidaciones_vencidas(self.db, cuenta)
 
         saldo = Decimal(str(
             cuenta.saldo_ars if dto.moneda == "ARS" else cuenta.saldo_usd
