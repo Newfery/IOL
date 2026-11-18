@@ -1,6 +1,9 @@
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from src.db.models.grupo_de_inversion_model import GrupoDeInversion
+from src.db.models.grupo_inversor_model import GrupoInversor
 from src.db.models.inversor_model import Inversor
 
 
@@ -22,6 +25,14 @@ class GrupoDeInversionRepository:
             plata_disponible=plata_disponible,
         )
         self.db.add(grupo)
+        self.db.flush()
+        self.db.add(
+            GrupoInversor(
+                grupo_id=grupo.id,
+                inversor_id=creador_id,
+                fecha_union=datetime.now(),
+            )
+        )
         self.db.commit()
         self.db.refresh(grupo)
         return grupo
@@ -53,6 +64,16 @@ class GrupoDeInversionRepository:
     def inversor_exists(self, inversor_id: int) -> bool:
         return self.db.get(Inversor, inversor_id) is not None
 
+    def ensure_creator_membership(self, grupo_id: int, creador_id: int) -> None:
+        if self.db.get(GrupoInversor, (grupo_id, creador_id)) is None:
+            self.db.add(
+                GrupoInversor(
+                    grupo_id=grupo_id,
+                    inversor_id=creador_id,
+                    fecha_union=datetime.now(),
+                )
+            )
+
     def update(self, grupo: GrupoDeInversion) -> GrupoDeInversion:
         self.db.add(grupo)
         self.db.commit()
@@ -60,5 +81,8 @@ class GrupoDeInversionRepository:
         return grupo
 
     def delete(self, grupo: GrupoDeInversion) -> None:
+        self.db.query(GrupoInversor).filter(
+            GrupoInversor.grupo_id == grupo.id
+        ).delete(synchronize_session=False)
         self.db.delete(grupo)
         self.db.commit()

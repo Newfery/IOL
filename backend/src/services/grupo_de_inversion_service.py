@@ -72,6 +72,11 @@ class GrupoDeInversionService:
 
         for field, value in fields.items():
             setattr(grupo, field, value)
+        if "creador_id" in fields:
+            self.repo.ensure_creator_membership(
+                grupo_id,
+                fields["creador_id"],
+            )
 
         try:
             updated = self.repo.update(grupo)
