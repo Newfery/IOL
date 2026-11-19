@@ -12,6 +12,8 @@ import yfinance as yf
 
 from src.db.connection import SessionLocal
 from src.db.models.activos_model import Activo
+# Register the target of Activo.inversores_favoritos for SQLAlchemy.
+from src.db.models.inversor_model import Inversor
 
 logger = logging.getLogger("yfinance_assets")
 
