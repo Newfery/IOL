@@ -288,7 +288,13 @@ function Index() {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="date" hide />
                     <YAxis domain={["auto", "auto"]} width={60} tick={{ fontSize: 10 }} />
-                    <Tooltip formatter={(value: number) => fmt(value, selected.currency)} labelFormatter={(label) => String(label)} />
+                    <Tooltip
+                      formatter={(value: number) => fmt(value, selected.currency)}
+                      labelFormatter={(label) => String(label)}
+                      contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)" }}
+                      itemStyle={{ color: "var(--foreground)" }}
+                      labelStyle={{ color: "var(--foreground)" }}
+                    />
                     <Line type="monotone" dataKey="price" stroke="var(--primary)" dot={false} strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
