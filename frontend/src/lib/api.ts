@@ -19,8 +19,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export type Asset = { symbol: string; name: string; price: number; change: number; type: "Acción" | "CEDEAR" | "Bono" | "FCI" };
-export type Holding = { symbol: string; qty: number; avgPrice: number };
+export type Asset = { symbol: string; name: string; price: number; change: number; type: "Acción" | "CEDEAR" | "Bono" | "ETF" | "FCI"; currency: "ARS" | "USD" };
+export type Holding = { symbol: string; qty: number; avgPrice: number; currency: "ARS" | "USD" };
 export type Order = { symbol: string; side: "buy" | "sell"; qty: number; price: number };
 export type HistoryPoint = { date: string; price: number };
 export type PerfilRiesgo = "conservador" | "moderado" | "agresivo";

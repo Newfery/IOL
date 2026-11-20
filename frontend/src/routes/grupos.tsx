@@ -55,9 +55,10 @@ function Grupos() {
 
   useEffect(() => {
     refresh();
-    getAssets().then((a) => {
-      setAssets(a);
-      setSymbol(a[0]?.symbol ?? "");
+    getAssets().then((assets) => {
+      const arsAssets = assets.filter((asset) => asset.currency === "ARS");
+      setAssets(arsAssets);
+      setSymbol(arsAssets[0]?.symbol ?? "");
     });
   }, []);
 

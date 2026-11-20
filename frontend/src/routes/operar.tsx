@@ -32,15 +32,17 @@ export const Route = createFileRoute("/operar")({
   ),
 });
 
-const fmt = (n: number) =>
-  n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 2 });
+const fmt = (n: number, currency: Asset["currency"]) =>
+  n.toLocaleString("es-AR", { style: "currency", currency, maximumFractionDigits: 2 });
 
-const CATEGORIES: { key: string; label: string; desc: string; icon: LucideIcon }[] = [
-  { key: "Favoritos", label: "Favoritos", desc: "Accedé rápido a los activos que más te interesan.", icon: Star },
-  { key: "Acción", label: "Acciones", desc: "Sé parte de grandes compañías de Argentina comprando acciones.", icon: TrendingUp },
-  { key: "CEDEAR", label: "CEDEARs", desc: "Invertí en empresas de Estados Unidos como Google, Amazon y Apple.", icon: Globe },
-  { key: "Bono", label: "Bonos", desc: "Títulos de deuda pública con pagos de interés periódicos.", icon: Landmark },
-  { key: "FCI", label: "FCI", desc: "Fondos comunes de inversión administrados por profesionales.", icon: PieChart },
+const CATEGORIES: { key: string; label: string; desc: string; icon: LucideIcon; matches: (asset: Asset) => boolean }[] = [
+  { key: "Favoritos", label: "Favoritos", desc: "Accedé rápido a los activos que más te interesan.", icon: Star, matches: () => true },
+  { key: "Acción", label: "Acciones Argentina", desc: "Acciones de empresas argentinas cotizadas en BYMA.", icon: TrendingUp, matches: (asset) => asset.type === "Acción" && asset.currency === "ARS" },
+  { key: "CEDEAR", label: "CEDEARs", desc: "Representaciones locales de activos extranjeros.", icon: Globe, matches: (asset) => asset.type === "CEDEAR" },
+  { key: "Acción EE.UU.", label: "Acciones EE.UU.", desc: "Acciones estadounidenses operadas en dólares.", icon: TrendingUp, matches: (asset) => asset.type === "Acción" && asset.currency === "USD" },
+  { key: "ETF", label: "ETFs", desc: "Fondos cotizados de acciones, bonos y otros mercados.", icon: PieChart, matches: (asset) => asset.type === "ETF" },
+  { key: "Bono", label: "Bonos", desc: "Títulos de deuda pública con pagos de interés periódicos.", icon: Landmark, matches: (asset) => asset.type === "Bono" },
+  { key: "FCI", label: "FCI", desc: "Fondos comunes de inversión administrados por profesionales.", icon: PieChart, matches: (asset) => asset.type === "FCI" },
 ];
 
 function Index() {
@@ -80,7 +82,9 @@ function Index() {
 
   const shown = filter
     ? assets
-        .filter((a) => (filter === "Favoritos" ? favorites.includes(a.symbol) : a.type === filter))
+        .filter((a) => filter === "Favoritos"
+          ? favorites.includes(a.symbol)
+          : CATEGORIES.find((category) => category.key === filter)?.matches(a) ?? false)
         .filter(
           (a) =>
             !search ||
@@ -206,7 +210,7 @@ function Index() {
                       <div className="text-xs text-muted-foreground">{a.name}</div>
                     </td>
                     <td className="p-4 text-muted-foreground">{a.type}</td>
-                    <td className="p-4 text-right font-mono">{fmt(a.price)}</td>
+                    <td className="p-4 text-right font-mono">{fmt(a.price, a.currency)}</td>
                     <td className={`p-4 text-right font-mono ${a.change >= 0 ? "text-gain" : "text-loss"}`}>
                       {a.change >= 0 ? "+" : ""}
                       {a.change.toFixed(2)}%
@@ -252,7 +256,7 @@ function Index() {
               <div>
                 <h2 className="font-display text-lg font-semibold">Operar {selected.symbol}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {selected.name} · {fmt(selected.price)}
+                  {selected.name} · {fmt(selected.price, selected.currency)}
                 </p>
               </div>
               <button
@@ -284,7 +288,7 @@ function Index() {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="date" hide />
                     <YAxis domain={["auto", "auto"]} width={60} tick={{ fontSize: 10 }} />
-                    <Tooltip formatter={(value: number) => fmt(value)} labelFormatter={(label) => String(label)} />
+                    <Tooltip formatter={(value: number) => fmt(value, selected.currency)} labelFormatter={(label) => String(label)} />
                     <Line type="monotone" dataKey="price" stroke="var(--primary)" dot={false} strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -300,7 +304,7 @@ function Index() {
             />
             <div className="mt-3 flex justify-between text-sm">
               <span className="text-muted-foreground">Total estimado</span>
-              <span className="font-mono">{fmt(selected.price * qty)}</span>
+              <span className="font-mono">{fmt(selected.price * qty, selected.currency)}</span>
             </div>
             <button
               onClick={submit}

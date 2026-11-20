@@ -53,28 +53,32 @@ def _group_payload(db: Session, group: GrupoDeInversion) -> dict:
 @router.get("/market/assets")
 def market_assets(db: Session = Depends(get_db)):
     assets = db.query(Activo).filter(Activo.activo.is_(True)).order_by(Activo.ticker).all()
-    type_names = {"accion": "Acción", "cedear": "CEDEAR", "bono": "Bono"}
-    result = []
-    for asset in assets:
-        change = 0.0
-        try:
-            market_symbol = asset.ticker if "." in asset.ticker else f"{asset.ticker}.BA"
-            quote = CotizacionService.obtener(market_symbol)
-            if quote.variacion_porcentual is not None:
-                change = float(quote.variacion_porcentual)
-        except Exception:
-            # Se conserva el último precio guardado si el proveedor no está disponible.
-            pass
-        result.append({"symbol": asset.ticker, "name": asset.nombre,
-                       "price": float(asset.precio_actual), "change": change,
-                       "type": type_names.get(asset.tipo, "FCI")})
-    return result
+    type_names = {
+        "accion": "Acción",
+        "cedear": "CEDEAR",
+        "bono": "Bono",
+        "etf": "ETF",
+    }
+    return [
+        {
+            "symbol": asset.ticker,
+            "name": asset.nombre,
+            "price": float(asset.precio_actual),
+            "change": float(asset.variacion_porcentual),
+            "type": type_names.get(asset.tipo, "FCI"),
+            "currency": asset.moneda,
+        }
+        for asset in assets
+    ]
 
 
 @router.get("/market/assets/{symbol}/history")
 def market_asset_history(symbol: str):
     ticker = symbol.strip().upper()
-    market_symbol = ticker if "." in ticker else f"{ticker}.BA"
+    if ticker.endswith(".US"):
+        market_symbol = ticker[:-3]
+    else:
+        market_symbol = ticker if "." in ticker else f"{ticker}.BA"
     try:
         history = yf.Ticker(market_symbol).history(period="1y", interval="1d", auto_adjust=False)
     except Exception as exc:
@@ -187,7 +191,8 @@ def portfolio(db: Session = Depends(get_db), current: Inversor = Depends(get_cur
     holdings = db.query(Tenencia, Activo).join(Activo, Activo.id == Tenencia.activo_id).filter(
         Tenencia.cuenta_id == account.id).all()
     return [{"symbol": asset.ticker, "qty": float(holding.cantidad),
-             "avgPrice": float(holding.precio_promedio)} for holding, asset in holdings]
+             "avgPrice": float(holding.precio_promedio),
+             "currency": asset.moneda} for holding, asset in holdings]
 
 
 @router.post("/orders", status_code=status.HTTP_201_CREATED)
@@ -271,6 +276,11 @@ def group_operation(group_id: int, payload: GroupOperationRequest, db: Session =
     quantity = payload.cantidad
     asset = db.query(Activo).filter(Activo.ticker == ticker, Activo.activo.is_(True)).first()
     if asset is None: raise NotFoundError("Activo no encontrado")
+    if str(asset.moneda) != "ARS":
+        raise HTTPException(
+            status_code=400,
+            detail="Las operaciones grupales solo admiten activos en ARS",
+        )
     if quantity <= 0: raise HTTPException(status_code=422, detail="La cantidad debe ser mayor a cero")
     price = Decimal(str(asset.precio_actual)); gross = quantity * price
     total = (gross * Decimal("1.005")).quantize(Decimal("0.01"))

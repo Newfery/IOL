@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Numeric, CheckConstraint
+from sqlalchemy import Column, Integer, String, Boolean, Numeric, CheckConstraint, text
 from sqlalchemy.orm import relationship
 
 from src.db.connection import Base
@@ -13,6 +13,9 @@ class Activo(Base):
     tipo = Column(String(10), nullable=False)
     moneda = Column(String(3), nullable=False)
     precio_actual = Column(Numeric(15, 2), nullable=False)
+    variacion_porcentual = Column(
+        Numeric(8, 4), nullable=False, default=0, server_default=text("0")
+    )
     nivel_riesgo = Column(Integer, nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
     inversores_favoritos = relationship(
@@ -22,7 +25,10 @@ class Activo(Base):
     )
 
     __table_args__ = (
-        CheckConstraint("tipo IN ('accion', 'cedear', 'bono')"),
+        CheckConstraint(
+            "tipo IN ('accion', 'cedear', 'bono', 'etf')",
+            name="chk_activo_tipo",
+        ),
         CheckConstraint("moneda IN ('ARS', 'USD')"),
         CheckConstraint("precio_actual > 0"),
         CheckConstraint("nivel_riesgo BETWEEN 1 AND 5")

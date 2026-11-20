@@ -24,7 +24,8 @@ export const Route = createFileRoute("/mis-inversiones")({
   ),
 });
 
-const ars = (n: number) => n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 2 });
+const fmt = (n: number, currency: Asset["currency"]) =>
+  n.toLocaleString("es-AR", { style: "currency", currency, maximumFractionDigits: 2 });
 const COLORS = ["var(--primary)", "var(--gain)", "var(--chart-3, #f59e0b)", "var(--chart-4, #60a5fa)", "var(--loss)", "var(--chart-5, #a78bfa)"];
 
 function MisInversiones() {
@@ -43,12 +44,14 @@ function MisInversiones() {
       holdings.map((h) => {
         const a = assets.find((x) => x.symbol === h.symbol);
         const price = a?.price ?? h.avgPrice;
+        const currency = a?.currency ?? h.currency;
         const value = price * h.qty;
         const pnl = (price - h.avgPrice) * h.qty;
         return {
           ...h,
           name: a?.name ?? h.symbol,
           type: a?.type ?? "—",
+          currency,
           price,
           value,
           pnl,
@@ -58,9 +61,14 @@ function MisInversiones() {
     [holdings, assets],
   );
 
-  const totalValue = rows.reduce((s, r) => s + r.value, 0);
-  const totalPnl = rows.reduce((s, r) => s + r.pnl, 0);
-  const pieData = rows.map((r) => ({ name: r.symbol, value: r.value }));
+  const arsRows = rows.filter((r) => r.currency === "ARS");
+  const usdRows = rows.filter((r) => r.currency === "USD");
+  const totalArsValue = arsRows.reduce((s, r) => s + r.value, 0);
+  const totalUsdValue = usdRows.reduce((s, r) => s + r.value, 0);
+  const totalArsPnl = arsRows.reduce((s, r) => s + r.pnl, 0);
+  const totalUsdPnl = usdRows.reduce((s, r) => s + r.pnl, 0);
+  const arsPieData = arsRows.map((r) => ({ name: r.symbol, value: r.value }));
+  const usdPieData = usdRows.map((r) => ({ name: r.symbol, value: r.value }));
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -73,10 +81,18 @@ function MisInversiones() {
           </div>
           <div className="text-right">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Valor total</p>
-            <p className="font-display text-2xl font-semibold">{ars(totalValue)}</p>
-            <p className={`text-sm ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
-              {totalPnl >= 0 ? "+" : ""}{ars(totalPnl)}
-            </p>
+            {arsRows.length > 0 && <p className="font-display text-2xl font-semibold">{fmt(totalArsValue, "ARS")}</p>}
+            {usdRows.length > 0 && <p className="font-display text-2xl font-semibold">{fmt(totalUsdValue, "USD")}</p>}
+            {arsRows.length > 0 && (
+              <p className={`text-sm ${totalArsPnl >= 0 ? "text-gain" : "text-loss"}`}>
+                Rendimiento ARS: {totalArsPnl >= 0 ? "+" : ""}{fmt(totalArsPnl, "ARS")}
+              </p>
+            )}
+            {usdRows.length > 0 && (
+              <p className={`text-sm ${totalUsdPnl >= 0 ? "text-gain" : "text-loss"}`}>
+                Rendimiento USD: {totalUsdPnl >= 0 ? "+" : ""}{fmt(totalUsdPnl, "USD")}
+              </p>
+            )}
           </div>
         </div>
 
@@ -109,9 +125,9 @@ function MisInversiones() {
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{r.type}</td>
                       <td className="px-4 py-3 text-right font-mono">{r.qty}</td>
-                      <td className="px-4 py-3 text-right font-mono">{ars(r.avgPrice)}</td>
-                      <td className="px-4 py-3 text-right font-mono">{ars(r.price)}</td>
-                      <td className="px-4 py-3 text-right font-mono">{ars(r.value)}</td>
+                      <td className="px-4 py-3 text-right font-mono">{fmt(r.avgPrice, r.currency)}</td>
+                      <td className="px-4 py-3 text-right font-mono">{fmt(r.price, r.currency)}</td>
+                      <td className="px-4 py-3 text-right font-mono">{fmt(r.value, r.currency)}</td>
                       <td className={`px-4 py-3 text-right font-mono ${r.pnl >= 0 ? "text-gain" : "text-loss"}`}>
                         {r.pnl >= 0 ? "+" : ""}{r.pnlPct.toFixed(1)}%
                       </td>
@@ -126,32 +142,45 @@ function MisInversiones() {
         {rows.length > 0 && (
           <section className="rounded-xl border border-border bg-card p-6">
             <h2 className="mb-2 font-display text-lg font-semibold">Composición de la cartera</h2>
-            <div className="mx-auto h-80 max-w-md">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={100} paddingAngle={2} stroke="none">
-                    {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip
-                    formatter={(v: number) => ars(v)}
-                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)" }}
-                    itemStyle={{ color: "var(--foreground)" }}
-                    labelStyle={{ color: "var(--foreground)" }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="grid gap-6 md:grid-cols-2">
+              {[
+                { label: "ARS", currency: "ARS" as const, data: arsPieData },
+                { label: "USD", currency: "USD" as const, data: usdPieData },
+              ].filter((chart) => chart.data.length > 0).map((chart) => (
+                <div key={chart.currency}>
+                  <h3 className="text-sm font-semibold text-muted-foreground">Posiciones en {chart.label}</h3>
+                  <div className="mx-auto h-72 max-w-md">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={chart.data} dataKey="value" nameKey="name" innerRadius={55} outerRadius={100} paddingAngle={2} stroke="none">
+                          {chart.data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip
+                          formatter={(v: number) => fmt(v, chart.currency)}
+                          contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)" }}
+                          itemStyle={{ color: "var(--foreground)" }}
+                          labelStyle={{ color: "var(--foreground)" }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              ))}
             </div>
             <ul className="mx-auto mt-6 max-w-md space-y-3 text-sm">
-              {rows.map((r, i) => (
+              {rows.map((r, i) => {
+                const currencyTotal = r.currency === "ARS" ? totalArsValue : totalUsdValue;
+                return (
                 <li key={r.symbol} className="flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <span className="h-3 w-3 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
                     <b>{r.symbol}</b>
                     <span className="text-muted-foreground">{r.name}</span>
                   </span>
-                  <span className="font-mono">{((r.value / totalValue) * 100).toFixed(1)}%</span>
+                  <span className="font-mono">{(currencyTotal ? (r.value / currencyTotal) * 100 : 0).toFixed(1)}%</span>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </section>
         )}

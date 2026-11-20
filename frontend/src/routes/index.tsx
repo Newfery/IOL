@@ -50,18 +50,30 @@ function Home() {
       holdings.map((h) => {
         const a = assets.find((x) => x.symbol === h.symbol);
         const price = a?.price ?? h.avgPrice;
+        const currency = a?.currency ?? h.currency;
         const value = price * h.qty;
         const pnl = (price - h.avgPrice) * h.qty;
-        return { ...h, name: a?.name ?? h.symbol, price, value, pnl, pnlPct: ((price - h.avgPrice) / h.avgPrice) * 100 };
+        const valueArs = currency === "USD" ? value * quotes.mep : value;
+        const pnlArs = currency === "USD" ? pnl * quotes.mep : pnl;
+        return {
+          ...h,
+          name: a?.name ?? h.symbol,
+          price,
+          value,
+          valueArs,
+          pnl,
+          pnlArs,
+          pnlPct: ((price - h.avgPrice) / h.avgPrice) * 100,
+        };
       }),
-    [holdings, assets],
+    [holdings, assets, quotes.mep],
   );
 
-  const invertido = rows.reduce((s, r) => s + r.value, 0);
+  const invertido = rows.reduce((s, r) => s + r.valueArs, 0);
   const totalArs = cuenta && quotes.mep ? cuenta.saldo_ars + cuenta.saldo_usd * quotes.mep + invertido : 0;
-  const totalPnl = rows.reduce((s, r) => s + r.pnl, 0);
+  const totalPnl = rows.reduce((s, r) => s + r.pnlArs, 0);
   const shownTotal = moneda === "ARS" ? ars(totalArs) : usd(totalArs / (moneda === "MEP" ? quotes.mep : quotes.ccl || 1));
-  const pieData = rows.filter((r) => r.pnl > 0).map((r) => ({ name: r.symbol, value: r.pnl }));
+  const pieData = rows.filter((r) => r.pnlArs > 0).map((r) => ({ name: r.symbol, value: r.pnlArs }));
 
   return (
     <div className="min-h-screen bg-background text-foreground">

@@ -54,19 +54,23 @@ GET http://localhost:8000/api/activos/cotizacion/GGAL.BA
 Devuelve el último cierre, el cierre anterior, la variación porcentual y la fecha.
 No requiere una API key ni modifica el precio guardado en la base de datos.
 
-### Cargar acciones y CEDEARs en el catálogo
+### Cargar activos en el catálogo
 
-`/api/market/assets` muestra únicamente los registros que ya existen en la tabla
-`activo`. Para validar y cargar una lista amplia de acciones argentinas y
-CEDEARs compatibles con Yahoo Finance, ejecutar desde `backend/`:
+`/api/market/assets` muestra los registros activos de la tabla `activo`. Para
+cargar acciones argentinas, CEDEARs, hasta 500 acciones estadounidenses de mayor
+capitalización (con umbral de USD 10.000 millones) y ETFs principales, ejecutar
+desde `backend/`:
 
 ```powershell
-python -m src.db.seeders.yfinance_assets
+.\venv\Scripts\python.exe -m src.db.seeders.yfinance_assets
 ```
 
-El sincronizador consulta precios recientes, omite símbolos sin cotización,
-inserta los nuevos y actualiza los existentes sin borrar activos ni tenencias.
-Volvé a ejecutarlo para refrescar el catálogo y los precios.
+El sincronizador consulta Yahoo Finance, omite símbolos sin cotización, inserta
+los nuevos y actualiza nombre, precio y variación de los existentes sin borrar
+activos ni tenencias. Yahoo no ofrece un catálogo global exhaustivo; esta es una
+selección amplia, no la totalidad de sus símbolos. Las acciones y ETFs de EE. UU.
+se guardan en USD con sufijo `.US` para distinguirlos de CEDEARs con el mismo
+ticker.
 
 ## Funcionalidades del broker
 
@@ -99,7 +103,8 @@ Para instalaciones existentes, aplicar en orden las migraciones
 [`001_inversor_password.sql`](src/db/migrations/001_inversor_password.sql),
 [`002_grupos_dashboard.sql`](src/db/migrations/002_grupos_dashboard.sql) y
 [`003_operacion_liquidacion.sql`](src/db/migrations/003_operacion_liquidacion.sql),
-[`004_users.sql`](src/db/migrations/004_users.sql).
+[`004_users.sql`](src/db/migrations/004_users.sql) y
+[`005_us_assets_catalog.sql`](src/db/migrations/005_us_assets_catalog.sql).
 La migración conserva los inversores actuales sin asignarles contraseñas.
 Configurar `PASSWORD_FINGERPRINT_SECRET` con un secreto estable y distinto de
 `JWT_SECRET`; si se omite, se deriva del `JWT_SECRET` configurado.
