@@ -30,6 +30,12 @@ export type Cuenta = { id: number; inversor_id: number; numero_comitente: string
 export type GroupMember = { name: string; contributed: number };
 export type Group = { id: string; name: string; code: string; members: GroupMember[]; cash: number; holdings: Holding[] };
 export type DolarQuotes = { mep: number | null; ccl: number | null };
+export type CreateMovimientoRequest = {
+  cuenta_id: number;
+  tipo: "deposito" | "extraccion";
+  moneda: Moneda;
+  monto: number;
+};
 
 export async function login(email: string, password: string): Promise<{ token: string; inversor: Inversor }> {
   const result = await request<{ token?: string; access_token?: string; inversor: Inversor }>("/api/auth/login", {
@@ -46,6 +52,9 @@ export async function getAssets(): Promise<Asset[]> { return request("/api/marke
 export async function getHistory(symbol: string): Promise<HistoryPoint[]> { return request(`/api/market/assets/${encodeURIComponent(symbol)}/history`); }
 export async function getDolarQuotes(): Promise<DolarQuotes> { return request("/api/market/dolar"); }
 export async function getBalance(): Promise<{ ars: number; usd: number }> { return request("/api/account/balance"); }
+export async function createMovimiento(movimiento: CreateMovimientoRequest): Promise<{ id: number }> {
+  return request("/api/movimientos/", { method: "POST", body: JSON.stringify(movimiento) });
+}
 export async function getPlazos(): Promise<Array<{ label: string; detalle: string; ars: number; usd: number }>> { return request("/api/cuenta/plazos"); }
 export async function getOrdenesPendientes(): Promise<Array<{ desc: string; ars: number; usd: number }>> { return request("/api/ordenes/pendientes"); }
 export async function getPortfolio(): Promise<Holding[]> { return request("/api/portfolio"); }

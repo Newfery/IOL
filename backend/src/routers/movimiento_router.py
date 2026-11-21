@@ -2,11 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.db.connection import get_db
+from src.db.models.cuenta_model import Cuenta
+from src.db.models.inversor_model import Inversor
 from src.dtos.movimiento_dto import (
     CreateMovimientoDTO,
     MovimientoResponseDTO,
     UpdateMovimientoDTO,
 )
+from src.middlewares.auth_middleware import get_current_inversor
 from src.schemas.movimiento_schema import (
     CreateMovimientoSchema,
     UpdateMovimientoSchema,
@@ -24,7 +27,21 @@ router = APIRouter(prefix="/movimientos", tags=["movimientos"])
 def create_movimiento(
     payload: CreateMovimientoSchema,
     db: Session = Depends(get_db),
+    current: Inversor = Depends(get_current_inversor),
 ):
+    account_id = db.query(Cuenta.id).filter(
+        Cuenta.inversor_id == current.id
+    ).scalar()
+    if account_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cuenta no encontrada",
+        )
+    if account_id != payload.cuenta_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No autorizado",
+        )
     dto = CreateMovimientoDTO(**payload.model_dump())
     return MovimientoService(db).create(dto)
 

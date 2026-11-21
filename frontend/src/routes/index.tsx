@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { AppHeader } from "@/components/AppHeader";
 import { RequireAuth } from "@/components/RequireAuth";
@@ -7,7 +7,7 @@ import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
-import { getAssets, getCuenta, getDolarQuotes, getPortfolio, type Asset, type Cuenta, type DolarQuotes, type Holding } from "@/lib/api";
+import { createMovimiento, getAssets, getCuenta, getDolarQuotes, getPortfolio, type Asset, type Cuenta, type DolarQuotes, type Holding } from "@/lib/api";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -41,6 +41,11 @@ function Home() {
   const [quoteError, setQuoteError] = useState(false);
   const [moneda, setMoneda] = useState<Moneda>("ARS");
   const [moneyAction, setMoneyAction] = useState<"deposit" | "withdraw" | null>(null);
+  const [moneyCurrency, setMoneyCurrency] = useState<"ARS" | "USD">("ARS");
+  const [moneyAmount, setMoneyAmount] = useState("");
+  const [moneySubmitting, setMoneySubmitting] = useState(false);
+  const [moneyError, setMoneyError] = useState("");
+  const [moneySuccess, setMoneySuccess] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -95,6 +100,46 @@ function Home() {
         ? usd(totalArs / conversionRate)
         : "—";
   const pieData = rows.filter((r) => r.pnlArs > 0).map((r) => ({ name: r.symbol, value: r.pnlArs }));
+
+  function openMoneyDialog(action: "deposit" | "withdraw") {
+    setMoneyAction(action);
+    setMoneyCurrency("ARS");
+    setMoneyAmount("");
+    setMoneyError("");
+    setMoneySuccess("");
+  }
+
+  async function submitMoneyMovement(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user || !cuenta || !moneyAction || moneySubmitting) return;
+
+    const amount = Number(moneyAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMoneyError("Ingresá un monto mayor a cero.");
+      return;
+    }
+
+    setMoneySubmitting(true);
+    setMoneyError("");
+    try {
+      await createMovimiento({
+        cuenta_id: cuenta.id,
+        tipo: moneyAction === "deposit" ? "deposito" : "extraccion",
+        moneda: moneyCurrency,
+        monto: amount,
+      });
+      setMoneySuccess(moneyAction === "deposit" ? "Depósito registrado correctamente." : "Retiro registrado correctamente.");
+      try {
+        setCuenta(await getCuenta(user.id));
+      } catch {
+        setMoneyError("El movimiento se registró, pero no se pudo actualizar el saldo. Cerrá este diálogo y recargá la página.");
+      }
+    } catch (error) {
+      setMoneyError(error instanceof Error ? error.message : "No se pudo registrar el movimiento.");
+    } finally {
+      setMoneySubmitting(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -151,10 +196,10 @@ function Home() {
         </section>
 
         <div className="mx-auto grid w-full max-w-2xl grid-cols-1 justify-center gap-4 py-2 sm:grid-cols-2" aria-label="Movimientos de dinero">
-          <Button size="lg" onClick={() => setMoneyAction("deposit")} className="h-16 w-full px-6 text-lg [&_svg]:size-5">
+          <Button size="lg" onClick={() => openMoneyDialog("deposit")} className="h-16 w-full px-6 text-lg [&_svg]:size-5">
             <ArrowDownToLine />Ingresar plata
           </Button>
-          <Button size="lg" variant="outline" onClick={() => setMoneyAction("withdraw")} className="h-16 w-full px-6 text-lg [&_svg]:size-5">
+          <Button size="lg" variant="outline" onClick={() => openMoneyDialog("withdraw")} className="h-16 w-full px-6 text-lg [&_svg]:size-5">
             <ArrowUpFromLine />Retirar plata
           </Button>
         </div>
@@ -215,10 +260,62 @@ function Home() {
           <DialogHeader>
             <DialogTitle>{moneyAction === "deposit" ? "Ingresar plata" : "Retirar plata"}</DialogTitle>
             <DialogDescription>
-              {moneyAction === "deposit" ? "El ingreso de dinero" : "El retiro de dinero"} todavía no está habilitado. Esta cuenta utiliza saldos de prueba y no permite transferencias reales.
+              Registrá un movimiento en el saldo de prueba de tu cuenta.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter><DialogClose asChild><Button variant="outline">Entendido</Button></DialogClose></DialogFooter>
+          {moneySuccess ? (
+            <div className="space-y-4">
+              <p role="status" className="text-sm text-gain">{moneySuccess}</p>
+              {moneyError && <p role="alert" className="text-sm text-loss">{moneyError}</p>}
+              <DialogFooter>
+                <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
+              </DialogFooter>
+            </div>
+          ) : (
+            <form onSubmit={submitMoneyMovement} className="space-y-4">
+              <label className="block space-y-1 text-sm">
+                <span>Moneda</span>
+                <select
+                  value={moneyCurrency}
+                  onChange={(event) => {
+                    if (event.target.value === "ARS" || event.target.value === "USD") {
+                      setMoneyCurrency(event.target.value);
+                    }
+                  }}
+                  disabled={moneySubmitting}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2"
+                >
+                  <option value="ARS">Pesos (ARS)</option>
+                  <option value="USD">Dólares (USD)</option>
+                </select>
+              </label>
+              <label className="block space-y-1 text-sm">
+                <span>Monto</span>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  value={moneyAmount}
+                  onChange={(event) => setMoneyAmount(event.target.value)}
+                  disabled={moneySubmitting}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2"
+                />
+              </label>
+              {cuenta && (
+                <p className="text-xs text-muted-foreground">
+                  Saldo disponible: {moneyCurrency === "ARS" ? ars(cuenta.saldo_ars) : usd(cuenta.saldo_usd)}
+                </p>
+              )}
+              {moneyError && <p role="alert" className="text-sm text-loss">{moneyError}</p>}
+              <DialogFooter>
+                <DialogClose asChild><Button variant="outline" type="button" disabled={moneySubmitting}>Cancelar</Button></DialogClose>
+                <Button type="submit" disabled={!cuenta || moneySubmitting}>
+                  {moneySubmitting ? "Procesando..." : moneyAction === "deposit" ? "Ingresar" : "Retirar"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
