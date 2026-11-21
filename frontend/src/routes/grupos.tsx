@@ -53,11 +53,22 @@ function Grupos() {
   const [symbol, setSymbol] = useState("");
   const [qty, setQty] = useState(1);
   const [msg, setMsg] = useState("");
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [groupsError, setGroupsError] = useState("");
+  const [assetsError, setAssetsError] = useState("");
 
   const refresh = async (selectId?: string) => {
-    const g = await getGroups();
-    setGroups([...g]);
-    setActiveId((cur) => selectId ?? cur ?? g[0]?.id ?? null);
+    setGroupsLoading(true);
+    setGroupsError("");
+    try {
+      const g = await getGroups();
+      setGroups([...g]);
+      setActiveId((cur) => selectId ?? cur ?? g[0]?.id ?? null);
+    } catch (error) {
+      setGroupsError(error instanceof Error ? error.message : "No se pudieron cargar tus grupos.");
+    } finally {
+      setGroupsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -66,6 +77,8 @@ function Grupos() {
       const arsAssets = assets.filter((asset) => asset.currency === "ARS");
       setAssets(arsAssets);
       setSymbol(arsAssets[0]?.symbol ?? "");
+    }).catch((error: unknown) => {
+      setAssetsError(error instanceof Error ? error.message : "No se pudieron cargar los activos.");
     });
     getDolarQuotes()
       .then((quotes) => setMep(quotes.mep))
@@ -168,10 +181,22 @@ function Grupos() {
         </section>
 
         {msg && <p className="text-sm text-primary">{msg}</p>}
+        {groupsError && (
+          <p role="alert" className="flex flex-wrap items-center gap-3 text-sm text-loss">
+            {groupsError}
+            <button type="button" onClick={() => void refresh()} className="underline">
+              Reintentar
+            </button>
+          </p>
+        )}
 
         <section className="grid gap-6 lg:grid-cols-4">
           <aside className="space-y-2">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Mis grupos</p>
+            {groupsLoading && <p role="status" className="text-sm text-muted-foreground">Cargando grupos…</p>}
+            {!groupsLoading && !groupsError && groups.length === 0 && (
+              <p className="text-sm text-muted-foreground">Todavía no pertenecés a ningún grupo.</p>
+            )}
             {groups.map((g) => (
               <button key={g.id} onClick={() => setActiveId(g.id)}
                 className={`w-full rounded-lg border border-border p-3 text-left text-sm ${g.id === activeId ? "bg-muted" : "bg-card"}`}>
@@ -238,6 +263,7 @@ function Grupos() {
 
                 <div className="rounded-xl border border-border bg-card p-5">
                   <h2 className="font-display text-lg font-semibold">Comprar con el pozo</h2>
+                  {assetsError && <p role="alert" className="mt-2 text-sm text-loss">{assetsError}</p>}
                   <select value={symbol} onChange={(e) => setSymbol(e.target.value)}
                     className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     {assets.map((a) => <option key={a.symbol} value={a.symbol}>{a.symbol} — {a.name}</option>)}

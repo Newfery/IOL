@@ -14,7 +14,7 @@ from src.db.models.cuenta_model import Cuenta
 from src.db.models.grupo_de_inversion_model import GrupoDeInversion
 from src.db.models.grupo_inversor_model import GrupoInversor
 from src.db.models.inversor_model import Inversor
-from src.routers.dashboard_router import contribute_group
+from src.routers.dashboard_router import contribute_group, my_groups
 from src.schemas.frontend_schema import GroupContributionRequest
 from src.services.dolar_service import DolarQuoteError
 
@@ -64,6 +64,13 @@ class GroupContributionRouteTests(unittest.TestCase):
         self.db.close()
         Base.metadata.drop_all(self.engine)
         self.engine.dispose()
+
+    def test_group_list_includes_groups_with_membership(self):
+        groups = my_groups(self.db, self.investor)
+
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0]["id"], str(self.group_id))
+        self.assertEqual(groups[0]["members"][0]["contributedUsd"], 0)
 
     @patch("src.routers.dashboard_router.OperacionService.acreditar_liquidaciones_vencidas")
     @patch("src.routers.dashboard_router.DolarQuoteService.obtener")

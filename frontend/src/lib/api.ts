@@ -6,7 +6,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${API_URL}${path}`, { ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { ...init, headers });
+  } catch (reason) {
+    const detail = reason instanceof Error ? ` ${reason.message}` : "";
+    throw new Error(
+      `No se pudo conectar con la API (${API_URL || path}). Verificá que el backend esté activo y que VITE_API_URL/CORS estén configurados.${detail}`,
+    );
+  }
   if (!response.ok) {
     let message = `Error ${response.status}`;
     try {
