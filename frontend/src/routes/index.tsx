@@ -3,6 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { AppHeader } from "@/components/AppHeader";
 import { RequireAuth } from "@/components/RequireAuth";
+import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
 import { getAssets, getCuenta, getDolarQuotes, getPortfolio, type Asset, type Cuenta, type DolarQuotes, type Holding } from "@/lib/api";
 
@@ -27,7 +30,7 @@ export const Route = createFileRoute("/")({
 type Moneda = "ARS" | "MEP" | "CCL";
 const ars = (n: number) => n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 2 });
 const usd = (n: number) => `US$ ${n.toLocaleString("es-AR", { maximumFractionDigits: 2 })}`;
-const COLORS = ["var(--primary)", "var(--gain)", "var(--chart-3, #f59e0b)", "var(--chart-4, #60a5fa)", "var(--loss)"];
+const COLORS = ["var(--primary)", "var(--chart-4)", "var(--chart-1)", "var(--chart-2)", "var(--loss)"];
 
 function Home() {
   const { user } = useAuth();
@@ -37,6 +40,7 @@ function Home() {
   const [quotes, setQuotes] = useState<DolarQuotes>({ mep: null, ccl: null });
   const [quoteError, setQuoteError] = useState(false);
   const [moneda, setMoneda] = useState<Moneda>("ARS");
+  const [moneyAction, setMoneyAction] = useState<"deposit" | "withdraw" | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -146,8 +150,17 @@ function Home() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-border bg-card">
-          <div className="border-b border-border p-4">
+        <div className="mx-auto grid w-full max-w-2xl grid-cols-1 justify-center gap-4 py-2 sm:grid-cols-2" aria-label="Movimientos de dinero">
+          <Button size="lg" onClick={() => setMoneyAction("deposit")} className="h-16 w-full px-6 text-lg [&_svg]:size-5">
+            <ArrowDownToLine />Ingresar plata
+          </Button>
+          <Button size="lg" variant="outline" onClick={() => setMoneyAction("withdraw")} className="h-16 w-full px-6 text-lg [&_svg]:size-5">
+            <ArrowUpFromLine />Retirar plata
+          </Button>
+        </div>
+
+        <section className="border-t border-border pt-6">
+          <div className="pb-4">
             <h2 className="font-display text-lg font-semibold">Mis inversiones</h2>
           </div>
           {rows.length === 0 ? (
@@ -157,30 +170,35 @@ function Home() {
             </div>
           ) : (
             <>
-              <div className="p-6">
-                <div className="mx-auto h-72 max-w-md">
+              <div className="grid items-center gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:gap-12">
+                <div className="min-w-0">
                   <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Rendimientos por activo</h3>
-                  <ResponsiveContainer width="100%" height="90%">
-                    <PieChart>
-                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2} stroke="none">
-                        {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip formatter={(v: number) => ars(v)}
-                        contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)" }}
-                        itemStyle={{ color: "var(--foreground)" }} labelStyle={{ color: "var(--foreground)" }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="h-80 w-full md:h-96" aria-label="Gráfico de rendimientos por activo">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={pieData} dataKey="value" nameKey="name" innerRadius="48%" outerRadius="85%" paddingAngle={2} stroke="none" isAnimationActive={false}>
+                          {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => ars(v)}
+                          contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)" }}
+                          itemStyle={{ color: "var(--foreground)" }} labelStyle={{ color: "var(--foreground)" }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-                <ul className="mx-auto mt-6 max-w-md space-y-3 text-sm">
+                <ul className="w-full divide-y divide-border text-sm" aria-label="Rendimiento de mis activos">
                   {rows.map((r) => {
                     const idx = pieData.findIndex((p) => p.name === r.symbol);
                     return (
-                      <li key={r.symbol} className="flex items-center justify-between">
-                        <span className="flex items-center gap-2">
-                          <span className="h-3 w-3 rounded-full" style={{ background: idx >= 0 ? COLORS[idx % COLORS.length] : "var(--muted)" }} />
-                          <b>{r.symbol}</b>
+                      <li key={r.symbol} className="flex items-center justify-between gap-4 py-5">
+                        <span className="flex min-w-0 items-center gap-3">
+                          <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: idx >= 0 ? COLORS[idx % COLORS.length] : "var(--muted)" }} />
+                          <span className="min-w-0">
+                            <b>{r.symbol}</b>
+                            <span className="mt-1 block break-words text-xs text-muted-foreground">{r.name}</span>
+                          </span>
                         </span>
-                        <span className={`font-mono ${r.pnl >= 0 ? "text-gain" : "text-loss"}`}>
+                        <span className={`shrink-0 font-mono text-base font-semibold ${r.pnl >= 0 ? "text-gain" : "text-loss"}`}>
                           {r.pnl >= 0 ? "+" : ""}{r.pnlPct.toFixed(1)}%
                         </span>
                       </li>
@@ -192,6 +210,17 @@ function Home() {
           )}
         </section>
       </main>
+      <Dialog open={moneyAction !== null} onOpenChange={(open) => { if (!open) setMoneyAction(null); }}>
+        <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{moneyAction === "deposit" ? "Ingresar plata" : "Retirar plata"}</DialogTitle>
+            <DialogDescription>
+              {moneyAction === "deposit" ? "El ingreso de dinero" : "El retiro de dinero"} todavía no está habilitado. Esta cuenta utiliza saldos de prueba y no permite transferencias reales.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter><DialogClose asChild><Button variant="outline">Entendido</Button></DialogClose></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

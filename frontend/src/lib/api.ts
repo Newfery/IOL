@@ -19,8 +19,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export type Asset = { symbol: string; name: string; price: number; change: number; type: "Acción" | "CEDEAR" | "Bono" | "ETF" | "FCI"; currency: "ARS" | "USD" };
-export type Holding = { symbol: string; qty: number; avgPrice: number; currency: "ARS" | "USD" };
+export type Moneda = "ARS" | "USD";
+export type Asset = { symbol: string; name: string; price: number; change: number; type: "Acción" | "CEDEAR" | "Bono" | "ETF" | "FCI"; currency: Moneda };
+export type Holding = { symbol: string; qty: number; avgPrice: number; currency: Moneda };
 export type Order = { symbol: string; side: "buy" | "sell"; qty: number; price: number };
 export type HistoryPoint = { date: string; price: number };
 export type PerfilRiesgo = "conservador" | "moderado" | "agresivo";
@@ -48,7 +49,7 @@ export async function getBalance(): Promise<{ ars: number; usd: number }> { retu
 export async function getPlazos(): Promise<Array<{ label: string; detalle: string; ars: number; usd: number }>> { return request("/api/cuenta/plazos"); }
 export async function getOrdenesPendientes(): Promise<Array<{ desc: string; ars: number; usd: number }>> { return request("/api/ordenes/pendientes"); }
 export async function getPortfolio(): Promise<Holding[]> { return request("/api/portfolio"); }
-export async function placeOrder(order: Order): Promise<{ ok?: boolean; id?: string }> { return request("/api/orders", { method: "POST", body: JSON.stringify(order) }); }
+export async function placeOrder(order: Order): Promise<{ ok: boolean; id: string }> { return request("/api/orders", { method: "POST", body: JSON.stringify(order) }); }
 export async function getGroups(): Promise<Group[]> { return request("/api/grupos"); }
 export async function createGroup(nombre: string, password: string): Promise<Group> { return request("/api/grupos", { method: "POST", body: JSON.stringify({ nombre, password }) }); }
 export async function joinGroup(nombre: string, password: string): Promise<Group> { return request("/api/grupos/unirse", { method: "POST", body: JSON.stringify({ nombre, password }) }); }
