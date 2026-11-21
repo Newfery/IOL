@@ -35,6 +35,7 @@ function Home() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [quotes, setQuotes] = useState({ mep: 0, ccl: 0 });
+  const [quoteError, setQuoteError] = useState(false);
   const [moneda, setMoneda] = useState<Moneda>("ARS");
 
   useEffect(() => {
@@ -42,7 +43,12 @@ function Home() {
     getCuenta(user.id).then(setCuenta);
     getAssets().then(setAssets);
     getPortfolio().then(setHoldings);
-    getDolarQuotes().then(setQuotes);
+    getDolarQuotes()
+      .then((value) => {
+        setQuotes(value);
+        setQuoteError(value.mep <= 0);
+      })
+      .catch(() => setQuoteError(true));
   }, [user]);
 
   const rows = useMemo(
@@ -70,9 +76,19 @@ function Home() {
   );
 
   const invertido = rows.reduce((s, r) => s + r.valueArs, 0);
-  const totalArs = cuenta && quotes.mep ? cuenta.saldo_ars + cuenta.saldo_usd * quotes.mep + invertido : 0;
+  const totalArs = cuenta ? cuenta.saldo_ars + cuenta.saldo_usd * quotes.mep + invertido : 0;
+  const totalReady =
+    cuenta !== null &&
+    ((cuenta.saldo_usd === 0 && !rows.some((r) => r.currency === "USD")) || quotes.mep > 0);
   const totalPnl = rows.reduce((s, r) => s + r.pnlArs, 0);
-  const shownTotal = moneda === "ARS" ? ars(totalArs) : usd(totalArs / (moneda === "MEP" ? quotes.mep : quotes.ccl || 1));
+  const conversionRate = moneda === "MEP" ? quotes.mep : quotes.ccl;
+  const shownTotal = !totalReady
+    ? "—"
+    : moneda === "ARS"
+      ? ars(totalArs)
+      : conversionRate > 0
+        ? usd(totalArs / conversionRate)
+        : "—";
   const pieData = rows.filter((r) => r.pnlArs > 0).map((r) => ({ name: r.symbol, value: r.pnlArs }));
 
   return (
@@ -92,6 +108,9 @@ function Home() {
               <p className={`mt-1 text-sm ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
                 Rend. acumulado {totalPnl >= 0 ? "+" : ""}{ars(totalPnl)}
               </p>
+              {cuenta && !totalReady && quoteError && (
+                <p className="mt-1 text-sm text-loss">No se pudo obtener la cotización MEP para calcular el total.</p>
+              )}
             </div>
             <div>
               <p className="mb-2 text-xs text-muted-foreground">Expresado en</p>
