@@ -28,6 +28,7 @@ export type Inversor = { id: number; email: string; nombre: string; cuit: string
 export type Cuenta = { id: number; inversor_id: number; numero_comitente: string; saldo_ars: number; saldo_usd: number };
 export type GroupMember = { name: string; contributed: number };
 export type Group = { id: string; name: string; code: string; members: GroupMember[]; cash: number; holdings: Holding[] };
+export type DolarQuotes = { mep: number | null; ccl: number | null };
 
 export async function login(email: string, password: string): Promise<{ token: string; inversor: Inversor }> {
   const result = await request<{ token?: string; access_token?: string; inversor: Inversor }>("/api/auth/login", {
@@ -42,7 +43,7 @@ export async function login(email: string, password: string): Promise<{ token: s
 export async function getCuenta(inversorId: number): Promise<Cuenta> { return request(`/api/inversores/${inversorId}/cuenta`); }
 export async function getAssets(): Promise<Asset[]> { return request("/api/market/assets"); }
 export async function getHistory(symbol: string): Promise<HistoryPoint[]> { return request(`/api/market/assets/${encodeURIComponent(symbol)}/history`); }
-export async function getDolarQuotes(): Promise<{ mep: number; ccl: number }> { return request("/api/market/dolar"); }
+export async function getDolarQuotes(): Promise<DolarQuotes> { return request("/api/market/dolar"); }
 export async function getBalance(): Promise<{ ars: number; usd: number }> { return request("/api/account/balance"); }
 export async function getPlazos(): Promise<Array<{ label: string; detalle: string; ars: number; usd: number }>> { return request("/api/cuenta/plazos"); }
 export async function getOrdenesPendientes(): Promise<Array<{ desc: string; ars: number; usd: number }>> { return request("/api/ordenes/pendientes"); }

@@ -1,4 +1,6 @@
+import logging
 from decimal import Decimal
+from typing import Literal
 from uuid import uuid4
 
 import yfinance as yf
@@ -23,11 +25,12 @@ from src.schemas.frontend_schema import (
     OrderRequest,
 )
 from src.services.operacion_service import OperacionService
-from src.services.cotizacion_service import CotizacionService
+from src.services.dolar_service import DolarQuoteError, DolarQuoteService
 from src.utils.errors import NotFoundError
 from src.utils.hash import hash_password, verify_password
 
 router = APIRouter(tags=["frontend"])
+logger = logging.getLogger(__name__)
 
 
 def _group_payload(db: Session, group: GrupoDeInversion) -> dict:
@@ -94,19 +97,25 @@ def market_dolar(db: Session = Depends(get_db)):
     by_ticker = {a.ticker: Decimal(str(a.precio_actual)) for a in db.query(Activo).filter(
         Activo.ticker.in_(["AL30", "AL30D", "GD30", "GD30C"]), Activo.activo.is_(True)
     ).all()}
-    def rate(local_a: str, local_b: str) -> float:
-        price_a, price_b = by_ticker.get(local_a), by_ticker.get(local_b)
-        if price_a is None or price_b is None:
-            try:
-                price_a = CotizacionService.obtener(f"{local_a}.BA").precio
-                price_b = CotizacionService.obtener(f"{local_b}.BA").precio
-            except Exception as exc:
-                raise HTTPException(status_code=502, detail=f"No se pudo calcular la cotización {local_a}/{local_b}") from exc
-        if price_b <= 0:
-            raise HTTPException(status_code=502, detail=f"Precio inválido para {local_b}")
-        return float(price_a / price_b)
 
-    return {"mep": rate("AL30", "AL30D"), "ccl": rate("GD30", "GD30C")}
+    def rate(
+        local_a: str,
+        local_b: str,
+        quote_type: Literal["mep", "ccl"],
+    ) -> float | None:
+        price_a, price_b = by_ticker.get(local_a), by_ticker.get(local_b)
+        if price_a is not None and price_b is not None and price_b > 0:
+            return float(price_a / price_b)
+        try:
+            return float(DolarQuoteService.obtener(quote_type))
+        except DolarQuoteError as exc:
+            logger.warning("No se pudo obtener la cotización %s: %s", quote_type, exc)
+            return None
+
+    return {
+        "mep": rate("AL30", "AL30D", "mep"),
+        "ccl": rate("GD30", "GD30C", "ccl"),
+    }
 
 
 @router.get("/inversores/{inversor_id}/cuenta")

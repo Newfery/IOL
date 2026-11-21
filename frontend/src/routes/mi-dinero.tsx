@@ -4,7 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/lib/auth";
-import { getBalance, getDolarQuotes, getPlazos, getOrdenesPendientes } from "@/lib/api";
+import { getBalance, getDolarQuotes, getPlazos, getOrdenesPendientes, type DolarQuotes } from "@/lib/api";
 
 export const Route = createFileRoute("/mi-dinero")({
   head: () => ({
@@ -31,7 +31,8 @@ const usd = (n: number) => `US$ ${n.toLocaleString("es-AR", { maximumFractionDig
 function MiDinero() {
   const { user } = useAuth();
   const [balance, setBalance] = useState<{ ars: number; usd: number } | null>(null);
-  const [quotes, setQuotes] = useState({ mep: 0, ccl: 0 });
+  const [quotes, setQuotes] = useState<DolarQuotes>({ mep: null, ccl: null });
+  const [mepUnavailable, setMepUnavailable] = useState(false);
   const [moneda, setMoneda] = useState<Moneda>("ARS");
   const [oculto, setOculto] = useState(false);
   const [plazos, setPlazos] = useState<Awaited<ReturnType<typeof getPlazos>>>([]);
@@ -43,7 +44,10 @@ function MiDinero() {
     Promise.allSettled([getBalance(), getDolarQuotes(), getPlazos(), getOrdenesPendientes()])
       .then(([b, q, p, o]) => {
         if (b.status === "fulfilled") setBalance(b.value);
-        if (q.status === "fulfilled") setQuotes(q.value);
+        if (q.status === "fulfilled") {
+          setQuotes(q.value);
+          setMepUnavailable(q.value.mep === null || q.value.mep <= 0);
+        }
         if (p.status === "fulfilled") setPlazos(p.value);
         if (o.status === "fulfilled") setPendientes(o.value);
         const failed = [b, q, p, o].find((result) => result.status === "rejected");
@@ -83,8 +87,11 @@ function MiDinero() {
               <p className="mt-2 font-display text-4xl font-semibold">
                 {balance ? ocultar(fmt(moneda === "ARS" ? totalArs : totalUsd)) : "—"}
               </p>
-              {moneda === "ARS" && balance && quotes.mep > 0 && (
+              {moneda === "ARS" && balance && quotes.mep !== null && quotes.mep > 0 && (
                 <p className="mt-1 text-sm text-muted-foreground">≈ {ocultar(usd(totalArs / quotes.mep))} al MEP</p>
+              )}
+              {moneda === "ARS" && balance && mepUnavailable && (
+                <p className="mt-1 text-sm text-loss">Cotización MEP no disponible.</p>
               )}
             </div>
             <button onClick={() => setOculto(!oculto)} aria-label={oculto ? "Mostrar saldo" : "Ocultar saldo"}

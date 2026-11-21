@@ -4,7 +4,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { AppHeader } from "@/components/AppHeader";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/lib/auth";
-import { getAssets, getCuenta, getDolarQuotes, getPortfolio, type Asset, type Cuenta, type Holding } from "@/lib/api";
+import { getAssets, getCuenta, getDolarQuotes, getPortfolio, type Asset, type Cuenta, type DolarQuotes, type Holding } from "@/lib/api";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -34,7 +34,7 @@ function Home() {
   const [cuenta, setCuenta] = useState<Cuenta | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [quotes, setQuotes] = useState({ mep: 0, ccl: 0 });
+  const [quotes, setQuotes] = useState<DolarQuotes>({ mep: null, ccl: null });
   const [quoteError, setQuoteError] = useState(false);
   const [moneda, setMoneda] = useState<Moneda>("ARS");
 
@@ -46,7 +46,7 @@ function Home() {
     getDolarQuotes()
       .then((value) => {
         setQuotes(value);
-        setQuoteError(value.mep <= 0);
+        setQuoteError(value.mep === null || value.mep <= 0);
       })
       .catch(() => setQuoteError(true));
   }, [user]);
@@ -59,8 +59,8 @@ function Home() {
         const currency = a?.currency ?? h.currency;
         const value = price * h.qty;
         const pnl = (price - h.avgPrice) * h.qty;
-        const valueArs = currency === "USD" ? value * quotes.mep : value;
-        const pnlArs = currency === "USD" ? pnl * quotes.mep : pnl;
+        const valueArs = currency === "USD" ? value * (quotes.mep ?? 0) : value;
+        const pnlArs = currency === "USD" ? pnl * (quotes.mep ?? 0) : pnl;
         return {
           ...h,
           name: a?.name ?? h.symbol,
@@ -76,17 +76,18 @@ function Home() {
   );
 
   const invertido = rows.reduce((s, r) => s + r.valueArs, 0);
-  const totalArs = cuenta ? cuenta.saldo_ars + cuenta.saldo_usd * quotes.mep + invertido : 0;
+  const totalArs = cuenta ? cuenta.saldo_ars + cuenta.saldo_usd * (quotes.mep ?? 0) + invertido : 0;
   const totalReady =
     cuenta !== null &&
-    ((cuenta.saldo_usd === 0 && !rows.some((r) => r.currency === "USD")) || quotes.mep > 0);
+    ((cuenta.saldo_usd === 0 && !rows.some((r) => r.currency === "USD")) ||
+      (quotes.mep !== null && quotes.mep > 0));
   const totalPnl = rows.reduce((s, r) => s + r.pnlArs, 0);
   const conversionRate = moneda === "MEP" ? quotes.mep : quotes.ccl;
   const shownTotal = !totalReady
     ? "—"
     : moneda === "ARS"
       ? ars(totalArs)
-      : conversionRate > 0
+      : conversionRate !== null && conversionRate > 0
         ? usd(totalArs / conversionRate)
         : "—";
   const pieData = rows.filter((r) => r.pnlArs > 0).map((r) => ({ name: r.symbol, value: r.pnlArs }));
@@ -124,7 +125,7 @@ function Home() {
               </div>
               {moneda !== "ARS" && (
                 <p className="mt-2 text-right text-xs text-muted-foreground">
-                  Cotización {ars(moneda === "MEP" ? quotes.mep : quotes.ccl)}
+                  Cotización {conversionRate !== null ? ars(conversionRate) : "—"}
                 </p>
               )}
             </div>
