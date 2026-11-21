@@ -15,6 +15,8 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as MiDineroRouteImport } from './routes/mi-dinero'
 import { Route as MisInversionesRouteImport } from './routes/mis-inversiones'
 import { Route as OperarRouteImport } from './routes/operar'
+import { Route as ActivosSymbolRouteImport } from './routes/activos.$symbol'
+import { Route as OperarCategoriaRouteImport } from './routes/operar_.$categoria'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +48,16 @@ const OperarRoute = OperarRouteImport.update({
   path: '/operar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ActivosSymbolRoute = ActivosSymbolRouteImport.update({
+  id: '/activos/$symbol',
+  path: '/activos/$symbol',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OperarCategoriaRoute = OperarCategoriaRouteImport.update({
+  id: '/operar_/$categoria',
+  path: '/operar/$categoria',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +66,8 @@ export interface FileRoutesByFullPath {
   '/mi-dinero': typeof MiDineroRoute
   '/mis-inversiones': typeof MisInversionesRoute
   '/operar': typeof OperarRoute
+  '/activos/$symbol': typeof ActivosSymbolRoute
+  '/operar/$categoria': typeof OperarCategoriaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +76,8 @@ export interface FileRoutesByTo {
   '/mi-dinero': typeof MiDineroRoute
   '/mis-inversiones': typeof MisInversionesRoute
   '/operar': typeof OperarRoute
+  '/activos/$symbol': typeof ActivosSymbolRoute
+  '/operar/$categoria': typeof OperarCategoriaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,13 +87,30 @@ export interface FileRoutesById {
   '/mi-dinero': typeof MiDineroRoute
   '/mis-inversiones': typeof MisInversionesRoute
   '/operar': typeof OperarRoute
+  '/activos/$symbol': typeof ActivosSymbolRoute
+  '/operar_/$categoria': typeof OperarCategoriaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/grupos' | '/login' | '/mi-dinero' | '/mis-inversiones' | '/operar'
+    | '/'
+    | '/grupos'
+    | '/login'
+    | '/mi-dinero'
+    | '/mis-inversiones'
+    | '/operar'
+    | '/activos/$symbol'
+    | '/operar/$categoria'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/grupos' | '/login' | '/mi-dinero' | '/mis-inversiones' | '/operar'
+  to:
+    | '/'
+    | '/grupos'
+    | '/login'
+    | '/mi-dinero'
+    | '/mis-inversiones'
+    | '/operar'
+    | '/activos/$symbol'
+    | '/operar/$categoria'
   id:
     | '__root__'
     | '/'
@@ -86,6 +119,8 @@ export interface FileRouteTypes {
     | '/mi-dinero'
     | '/mis-inversiones'
     | '/operar'
+    | '/activos/$symbol'
+    | '/operar_/$categoria'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -95,6 +130,8 @@ export interface RootRouteChildren {
   MiDineroRoute: typeof MiDineroRoute
   MisInversionesRoute: typeof MisInversionesRoute
   OperarRoute: typeof OperarRoute
+  ActivosSymbolRoute: typeof ActivosSymbolRoute
+  OperarCategoriaRoute: typeof OperarCategoriaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -141,6 +178,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OperarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/activos/$symbol': {
+      id: '/activos/$symbol'
+      path: '/activos/$symbol'
+      fullPath: '/activos/$symbol'
+      preLoaderRoute: typeof ActivosSymbolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/operar_/$categoria': {
+      id: '/operar_/$categoria'
+      path: '/operar/$categoria'
+      fullPath: '/operar/$categoria'
+      preLoaderRoute: typeof OperarCategoriaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -151,6 +202,8 @@ const rootRouteChildren: RootRouteChildren = {
   MiDineroRoute: MiDineroRoute,
   MisInversionesRoute: MisInversionesRoute,
   OperarRoute: OperarRoute,
+  ActivosSymbolRoute: ActivosSymbolRoute,
+  OperarCategoriaRoute: OperarCategoriaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

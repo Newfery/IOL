@@ -239,7 +239,13 @@ function Home() {
                         <span className="flex min-w-0 items-center gap-3">
                           <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: idx >= 0 ? COLORS[idx % COLORS.length] : "var(--muted)" }} />
                           <span className="min-w-0">
-                            <b>{r.symbol}</b>
+                            <Link
+                              to="/activos/$symbol"
+                              params={{ symbol: r.symbol }}
+                              className="font-semibold hover:text-primary"
+                            >
+                              {r.symbol}
+                            </Link>
                             <span className="mt-1 block break-words text-xs text-muted-foreground">{r.name}</span>
                           </span>
                         </span>

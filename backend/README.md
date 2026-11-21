@@ -104,15 +104,19 @@ Para instalaciones existentes, aplicar en orden las migraciones
 [`002_grupos_dashboard.sql`](src/db/migrations/002_grupos_dashboard.sql) y
 [`003_operacion_liquidacion.sql`](src/db/migrations/003_operacion_liquidacion.sql),
 [`004_users.sql`](src/db/migrations/004_users.sql) y
-[`005_us_assets_catalog.sql`](src/db/migrations/005_us_assets_catalog.sql).
+[`005_us_assets_catalog.sql`](src/db/migrations/005_us_assets_catalog.sql) y
+[`006_aporte_grupo_moneda.sql`](src/db/migrations/006_aporte_grupo_moneda.sql).
 La migración conserva los inversores actuales sin asignarles contraseñas.
 Configurar `PASSWORD_FINGERPRINT_SECRET` con un secreto estable y distinto de
 `JWT_SECRET`; si se omite, se deriva del `JWT_SECRET` configurado.
 
 El frontend usa además `POST /api/auth/login` (devuelve `token` e `inversor`) y
 rutas de mercado, cuenta, cartera, órdenes y grupos bajo `/api`. Los aportes
-grupales se debitan del saldo ARS del inversor y se registran en `aporte_grupo`;
-las claves de acceso del grupo se guardan con hash.
+grupales aceptan ARS o USD: se debitan de la moneda elegida, el pozo se acredita
+en ARS y los aportes en USD se convierten al MEP disponible al momento de la
+operación. `aporte_grupo` conserva moneda, monto original y cotización usada;
+la migración 006 mantiene los aportes históricos como ARS. Las claves de acceso
+del grupo se guardan con hash.
 
 `GET /api/market/dolar` usa los precios de AL30/AL30D y GD30/GD30C del catálogo
 cuando están disponibles; si falta alguna pata, consulta el dólar Bolsa y el

@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -24,6 +25,7 @@ class GroupCredentialsRequest(BaseModel):
 
 class GroupContributionRequest(BaseModel):
     monto: Decimal = Field(gt=0, max_digits=15, decimal_places=2)
+    moneda: Literal["ARS", "USD"] = "ARS"
 
 
 class GroupOperationRequest(BaseModel):

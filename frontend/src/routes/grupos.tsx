@@ -5,12 +5,14 @@ import { AppHeader } from "@/components/AppHeader";
 import {
   contributeToGroup,
   createGroup,
+  getDolarQuotes,
   getAssets,
   getGroups,
   groupBuy,
   joinGroup,
   type Asset,
   type Group,
+  type Moneda,
 } from "@/lib/api";
 
 export const Route = createFileRoute("/grupos")({
@@ -33,6 +35,8 @@ export const Route = createFileRoute("/grupos")({
 
 const fmt = (n: number) =>
   n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 2 });
+const fmtUsd = (n: number) =>
+  n.toLocaleString("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
 
 function Grupos() {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -43,6 +47,9 @@ function Grupos() {
   const [code, setCode] = useState("");
   const [joinPass, setJoinPass] = useState("");
   const [amount, setAmount] = useState(10000);
+  const [currency, setCurrency] = useState<Moneda>("ARS");
+  const [mep, setMep] = useState<number | null>(null);
+  const [quoteError, setQuoteError] = useState("");
   const [symbol, setSymbol] = useState("");
   const [qty, setQty] = useState(1);
   const [msg, setMsg] = useState("");
@@ -60,6 +67,11 @@ function Grupos() {
       setAssets(arsAssets);
       setSymbol(arsAssets[0]?.symbol ?? "");
     });
+    getDolarQuotes()
+      .then((quotes) => setMep(quotes.mep))
+      .catch((error: unknown) => {
+        setQuoteError(error instanceof Error ? error.message : "No se pudo obtener MEP.");
+      });
   }, []);
 
   const group = groups.find((g) => g.id === activeId) ?? null;
@@ -93,10 +105,14 @@ function Grupos() {
     refresh(g.id);
   }
   async function onContribute() {
-    if (!group || amount <= 0) return;
+    if (!group) return;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMsg("Poné un monto mayor a cero.");
+      return;
+    }
     try {
-      await contributeToGroup(group.id, amount);
-      setMsg(`Aportaste ${fmt(amount)} al pozo.`);
+      await contributeToGroup(group.id, amount, currency);
+      setMsg(`Aportaste ${currency === "ARS" ? fmt(amount) : fmtUsd(amount)} al pozo.`);
       await refresh();
     } catch (e) {
       setMsg((e as Error).message);
@@ -180,7 +196,12 @@ function Grupos() {
                       <li key={m.name} className="flex justify-between">
                         <span>{m.name}</span>
                         <span className="font-mono">
-                          {fmt(m.contributed)}{" "}
+                          {fmt(m.contributed)}
+                          {m.contributedUsd > 0 && (
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              ({fmtUsd(m.contributedUsd)} aportados)
+                            </span>
+                          )}{" "}
                           <span className="text-muted-foreground">
                             ({totalPool ? ((m.contributed / totalPool) * 100).toFixed(0) : 0}%)
                           </span>
@@ -189,10 +210,30 @@ function Grupos() {
                     ))}
                   </ul>
                   <div className="mt-4 flex gap-2">
-                    <input type="number" min={1} value={amount} onChange={(e) => setAmount(Number(e.target.value))}
+                    <select
+                      value={currency}
+                      onChange={(event) => {
+                        if (event.target.value === "ARS" || event.target.value === "USD") {
+                          const nextCurrency = event.target.value;
+                          setCurrency(nextCurrency);
+                          setAmount(nextCurrency === "ARS" ? 10000 : 100);
+                        }
+                      }}
+                      className="rounded-md border border-input bg-background px-3 py-2 text-sm">
+                      <option value="ARS">ARS</option>
+                      <option value="USD">USD</option>
+                    </select>
+                    <input type="number" min={0.01} step={0.01} value={amount} onChange={(e) => setAmount(Number(e.target.value))}
                       className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" />
                     <button onClick={onContribute} className="rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground">Aportar</button>
                   </div>
+                  {currency === "USD" && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {mep
+                        ? `Acreditación estimada: ${fmt(amount * mep)} al MEP de ${fmt(mep)}.`
+                        : quoteError || "No hay una cotización MEP disponible."}
+                    </p>
+                  )}
                 </div>
 
                 <div className="rounded-xl border border-border bg-card p-5">

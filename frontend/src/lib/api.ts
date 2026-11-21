@@ -27,7 +27,7 @@ export type HistoryPoint = { date: string; price: number };
 export type PerfilRiesgo = "conservador" | "moderado" | "agresivo";
 export type Inversor = { id: number; email: string; nombre: string; cuit: string; perfil_riesgo: PerfilRiesgo; fecha_alta: string };
 export type Cuenta = { id: number; inversor_id: number; numero_comitente: string; saldo_ars: number; saldo_usd: number };
-export type GroupMember = { name: string; contributed: number };
+export type GroupMember = { name: string; contributed: number; contributedUsd: number };
 export type Group = { id: string; name: string; code: string; members: GroupMember[]; cash: number; holdings: Holding[] };
 export type DolarQuotes = { mep: number | null; ccl: number | null };
 export type CreateMovimientoRequest = {
@@ -62,5 +62,10 @@ export async function placeOrder(order: Order): Promise<{ ok: boolean; id: strin
 export async function getGroups(): Promise<Group[]> { return request("/api/grupos"); }
 export async function createGroup(nombre: string, password: string): Promise<Group> { return request("/api/grupos", { method: "POST", body: JSON.stringify({ nombre, password }) }); }
 export async function joinGroup(nombre: string, password: string): Promise<Group> { return request("/api/grupos/unirse", { method: "POST", body: JSON.stringify({ nombre, password }) }); }
-export async function contributeToGroup(groupId: string, monto: number): Promise<Group> { return request(`/api/grupos/${groupId}/aportes`, { method: "POST", body: JSON.stringify({ monto }) }); }
+export async function contributeToGroup(groupId: string, monto: number, moneda: Moneda = "ARS"): Promise<Group> {
+  return request(`/api/grupos/${groupId}/aportes`, {
+    method: "POST",
+    body: JSON.stringify({ monto, moneda }),
+  });
+}
 export async function groupBuy(groupId: string, ticker: string, cantidad: number): Promise<Group> { return request(`/api/grupos/${groupId}/operaciones`, { method: "POST", body: JSON.stringify({ ticker, cantidad }) }); }

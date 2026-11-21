@@ -154,7 +154,15 @@ CREATE TABLE aporte_grupo (
     grupo_id INT NOT NULL REFERENCES grupo_de_inversion(id) ON DELETE CASCADE,
     inversor_id INT NOT NULL REFERENCES inversor(id) ON DELETE CASCADE,
     monto DECIMAL(15, 2) NOT NULL CHECK (monto > 0),
-    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    moneda VARCHAR(3) NOT NULL DEFAULT 'ARS'
+        CHECK (moneda IN ('ARS', 'USD')),
+    monto_original DECIMAL(15, 2) NOT NULL CHECK (monto_original > 0),
+    cotizacion_mep DECIMAL(15, 4),
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_aporte_grupo_cotizacion_mep CHECK (
+        (moneda = 'ARS' AND cotizacion_mep IS NULL)
+        OR (moneda = 'USD' AND cotizacion_mep > 0)
+    )
 );
 
 CREATE INDEX ix_aporte_grupo_grupo_inversor ON aporte_grupo (grupo_id, inversor_id);

@@ -1,5 +1,5 @@
 import logging
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 from uuid import uuid4
 
@@ -40,13 +40,26 @@ def _group_payload(db: Session, group: GrupoDeInversion) -> dict:
     totals = dict(db.query(AporteGrupo.inversor_id, func.coalesce(func.sum(AporteGrupo.monto), 0))
                   .filter(AporteGrupo.grupo_id == group.id)
                   .group_by(AporteGrupo.inversor_id).all())
+    usd_totals = dict(
+        db.query(
+            AporteGrupo.inversor_id,
+            func.coalesce(func.sum(AporteGrupo.monto_original), 0),
+        )
+        .filter(AporteGrupo.grupo_id == group.id, AporteGrupo.moneda == "USD")
+        .group_by(AporteGrupo.inversor_id)
+        .all()
+    )
     holdings = db.query(TenenciaGrupo, Activo).join(
         Activo, Activo.id == TenenciaGrupo.activo_id
     ).filter(TenenciaGrupo.grupo_id == group.id).all()
     return {
         "id": str(group.id), "name": group.nombre, "code": group.codigo_union,
         "cash": float(group.plata_disponible),
-        "members": [{"name": investor.nombre, "contributed": float(totals.get(investor.id, 0))}
+        "members": [{
+            "name": investor.nombre,
+            "contributed": float(totals.get(investor.id, 0)),
+            "contributedUsd": float(usd_totals.get(investor.id, 0)),
+        }
                     for _, investor in memberships],
         "holdings": [{"symbol": asset.ticker, "qty": float(holding.cantidad),
                       "avgPrice": float(holding.precio_promedio)} for holding, asset in holdings],
@@ -94,28 +107,41 @@ def market_asset_history(symbol: str):
 
 @router.get("/market/dolar")
 def market_dolar(db: Session = Depends(get_db)):
-    by_ticker = {a.ticker: Decimal(str(a.precio_actual)) for a in db.query(Activo).filter(
+    by_ticker = {str(a.ticker): Decimal(str(a.precio_actual)) for a in db.query(Activo).filter(
         Activo.ticker.in_(["AL30", "AL30D", "GD30", "GD30C"]), Activo.activo.is_(True)
     ).all()}
 
-    def rate(
-        local_a: str,
-        local_b: str,
-        quote_type: Literal["mep", "ccl"],
-    ) -> float | None:
-        price_a, price_b = by_ticker.get(local_a), by_ticker.get(local_b)
-        if price_a is not None and price_b is not None and price_b > 0:
-            return float(price_a / price_b)
-        try:
-            return float(DolarQuoteService.obtener(quote_type))
-        except DolarQuoteError as exc:
-            logger.warning("No se pudo obtener la cotización %s: %s", quote_type, exc)
-            return None
-
     return {
-        "mep": rate("AL30", "AL30D", "mep"),
-        "ccl": rate("GD30", "GD30C", "ccl"),
+        "mep": _dolar_rate(db, by_ticker, "AL30", "AL30D", "mep"),
+        "ccl": _dolar_rate(db, by_ticker, "GD30", "GD30C", "ccl"),
     }
+
+
+def _dolar_rate(
+    db: Session,
+    prices: dict[str, Decimal] | None,
+    local_a: str,
+    local_b: str,
+    quote_type: Literal["mep", "ccl"],
+) -> float | None:
+    if prices is None:
+        rates = {
+            str(asset.ticker): Decimal(str(asset.precio_actual))
+            for asset in db.query(Activo).filter(
+                Activo.ticker.in_([local_a, local_b]),
+                Activo.activo.is_(True),
+            ).all()
+        }
+    else:
+        rates = prices
+    price_a, price_b = rates.get(local_a), rates.get(local_b)
+    if price_a is not None and price_b is not None and price_b > 0:
+        return float(price_a / price_b)
+    try:
+        return float(DolarQuoteService.obtener(quote_type))
+    except DolarQuoteError as exc:
+        logger.warning("No se pudo obtener la cotización %s: %s", quote_type, exc)
+        return None
 
 
 @router.get("/inversores/{inversor_id}/cuenta")
@@ -264,12 +290,45 @@ def contribute_group(group_id: int, payload: GroupContributionRequest, db: Sessi
     if amount <= 0: raise HTTPException(status_code=422, detail="El aporte debe ser mayor a cero")
     if account is not None:
         OperacionService.acreditar_liquidaciones_vencidas(db, account)
-    if account is None or Decimal(str(account.saldo_ars)) < amount:
-        raise HTTPException(status_code=400, detail="Saldo ARS insuficiente para aportar")
+    account_balance = (
+        Decimal(str(account.saldo_ars if payload.moneda == "ARS" else account.saldo_usd))
+        if account is not None
+        else Decimal("0")
+    )
+    if account is None or account_balance < amount:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Saldo {payload.moneda} insuficiente para aportar",
+        )
+    rate = None
+    credited_ars = amount
+    if payload.moneda == "USD":
+        mep = _dolar_rate(db, None, "AL30", "AL30D", "mep")
+        if mep is None or mep <= 0:
+            raise HTTPException(
+                status_code=503,
+                detail="No hay una cotización MEP disponible para convertir el aporte",
+            )
+        rate = Decimal(str(mep)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        credited_ars = (amount * rate).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
     try:
-        account.saldo_ars = Decimal(str(account.saldo_ars)) - amount
-        group.plata_disponible = Decimal(str(group.plata_disponible)) + amount
-        db.add(AporteGrupo(grupo_id=group_id, inversor_id=current.id, monto=amount)); db.commit()
+        if payload.moneda == "ARS":
+            account.saldo_ars = account_balance - amount
+        else:
+            account.saldo_usd = account_balance - amount
+        group.plata_disponible = Decimal(str(group.plata_disponible)) + credited_ars
+        db.add(AporteGrupo(
+            grupo_id=group_id,
+            inversor_id=current.id,
+            monto=credited_ars,
+            moneda=payload.moneda,
+            monto_original=amount,
+            cotizacion_mep=rate,
+        ))
+        db.commit()
     except Exception:
         db.rollback(); raise
     return _group_payload(db, group)

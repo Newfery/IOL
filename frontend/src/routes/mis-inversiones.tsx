@@ -120,7 +120,13 @@ function MisInversiones() {
                   {rows.map((r) => (
                     <tr key={r.symbol} className="border-b border-border/50 last:border-0">
                       <td className="px-4 py-3">
-                        <b>{r.symbol}</b>
+                        <Link
+                          to="/activos/$symbol"
+                          params={{ symbol: r.symbol }}
+                          className="font-semibold hover:text-primary"
+                        >
+                          {r.symbol}
+                        </Link>
                         <span className="ml-2 text-muted-foreground">{r.name}</span>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{r.type}</td>
