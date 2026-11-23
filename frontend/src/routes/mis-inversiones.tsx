@@ -158,48 +158,51 @@ function MisInversiones() {
         {rows.length > 0 && (
           <section className="rounded-xl border border-border bg-card p-6">
             <h2 className="mb-2 font-display text-lg font-semibold">Composición de la cartera</h2>
-            <div className="grid gap-6 md:grid-cols-2">
-              {[
-                { label: "ARS", currency: "ARS" as const, data: arsPieData },
-                { label: "USD", currency: "USD" as const, data: usdPieData },
-              ].filter((chart) => chart.data.length > 0).map((chart) => (
-                <div key={chart.currency}>
-                  <h3 className="text-sm font-semibold text-muted-foreground">Posiciones en {chart.label}</h3>
-                  <div className="mx-auto h-72 max-w-md">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={chart.data} dataKey="value" nameKey="name" innerRadius={55} outerRadius={100} paddingAngle={2} stroke="none">
-                          {chart.data.map((entry) => (
-                            <Cell key={entry.name} fill={colorForSymbol(entry.name)} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(v: number) => fmt(v, chart.currency)}
-                          contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)" }}
-                          itemStyle={{ color: "var(--foreground)" }}
-                          labelStyle={{ color: "var(--foreground)" }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+            <div className="grid items-start gap-8 md:grid-cols-2">
+              <div className="space-y-6">
+                {[
+                  { label: "ARS", currency: "ARS" as const, data: arsPieData },
+                  { label: "USD", currency: "USD" as const, data: usdPieData },
+                ].filter((chart) => chart.data.length > 0).map((chart) => (
+                  <div key={chart.currency}>
+                    <h3 className="text-sm font-semibold text-muted-foreground">Posiciones en {chart.label}</h3>
+                    <div className="mx-auto h-72 max-w-md">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={chart.data} dataKey="value" nameKey="name" innerRadius={55} outerRadius={100} paddingAngle={2} stroke="none">
+                            {chart.data.map((entry) => (
+                              <Cell key={entry.name} fill={colorForSymbol(entry.name)} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(v: number) => fmt(v, chart.currency)}
+                            contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)" }}
+                            itemStyle={{ color: "var(--foreground)" }}
+                            labelStyle={{ color: "var(--foreground)" }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <ul className="space-y-3 text-sm md:pt-1">
+                {rows.map((r) => {
+                  const currencyTotal = r.currency === "ARS" ? totalArsValue : totalUsdValue;
+                  return (
+                    <li key={r.symbol} className="flex items-center justify-between gap-4">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: colorForSymbol(r.symbol) }} />
+                        <b className="shrink-0">{r.symbol}</b>
+                        <span className="truncate text-muted-foreground">{r.name}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{r.currency}</span>
+                      </span>
+                      <span className="shrink-0 font-mono">{(currencyTotal ? (r.value / currencyTotal) * 100 : 0).toFixed(1)}%</span>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
-            <ul className="mx-auto mt-6 max-w-md space-y-3 text-sm">
-              {rows.map((r) => {
-                const currencyTotal = r.currency === "ARS" ? totalArsValue : totalUsdValue;
-                return (
-                <li key={r.symbol} className="flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full" style={{ background: colorForSymbol(r.symbol) }} />
-                    <b>{r.symbol}</b>
-                    <span className="text-muted-foreground">{r.name}</span>
-                  </span>
-                  <span className="font-mono">{(currencyTotal ? (r.value / currencyTotal) * 100 : 0).toFixed(1)}%</span>
-                </li>
-                );
-              })}
-            </ul>
           </section>
         )}
       </main>
