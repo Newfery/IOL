@@ -103,7 +103,35 @@ function AssetDetail() {
   const change = first && last && first.price !== 0 ? (last.price / first.price - 1) * 100 : 0;
   const category = asset ? categoryForAsset(asset) : null;
   const prices = points.map((point) => point.price);
-  const chartColor = change >= 0 ? "var(--gain)" : "var(--loss)";
+  const chartData: Array<{ date: string; price: number; [key: string]: string | number | null }> =
+    points.map((point) => ({ ...point }));
+  const chartSegments: Array<{ dataKey: string; color: string }> = [];
+  let segmentStart = 0;
+  while (segmentStart < points.length - 1) {
+    const direction = Math.sign(points[segmentStart + 1].price - points[segmentStart].price);
+    let segmentEnd = segmentStart + 1;
+    while (
+      segmentEnd < points.length - 1 &&
+      Math.sign(points[segmentEnd + 1].price - points[segmentEnd].price) === direction
+    ) {
+      segmentEnd += 1;
+    }
+
+    const dataKey = `trend-${chartSegments.length}`;
+    for (let index = segmentStart; index <= segmentEnd; index += 1) {
+      chartData[index][dataKey] = points[index].price;
+    }
+    chartSegments.push({
+      dataKey,
+      color:
+        direction > 0
+          ? "var(--gain)"
+          : direction < 0
+            ? "var(--loss)"
+            : "#fff",
+    });
+    segmentStart = segmentEnd;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -172,7 +200,7 @@ function AssetDetail() {
                 <>
                   <div className="h-80 w-full sm:h-96">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={points} margin={{ top: 12, right: 12, bottom: 8, left: 0 }}>
+                      <LineChart data={chartData} margin={{ top: 12, right: 12, bottom: 8, left: 0 }}>
                         <CartesianGrid stroke="var(--border)" vertical={false} strokeDasharray="3 3" />
                         <XAxis
                           dataKey="date"
@@ -202,15 +230,18 @@ function AssetDetail() {
                             color: "var(--foreground)",
                           }}
                         />
-                        <Line
-                          type="linear"
-                          dataKey="price"
-                          stroke={chartColor}
-                          strokeWidth={2}
-                          dot={false}
-                          activeDot={{ r: 4 }}
-                          isAnimationActive={false}
-                        />
+                        {chartSegments.map(({ dataKey, color }) => (
+                          <Line
+                            key={dataKey}
+                            type="linear"
+                            dataKey={dataKey}
+                            stroke={color}
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{ r: 4 }}
+                            isAnimationActive={false}
+                          />
+                        ))}
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
