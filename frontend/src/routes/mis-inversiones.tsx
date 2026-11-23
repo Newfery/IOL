@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/lib/auth";
 import { getAssets, getPortfolio, type Asset, type Holding } from "@/lib/api";
+import { createAssetColorMap, getAssetColor } from "@/lib/asset-colors";
 
 export const Route = createFileRoute("/mis-inversiones")({
   head: () => ({
@@ -60,17 +61,10 @@ function MisInversiones() {
     [holdings, assets],
   );
 
-  const colorBySymbol = useMemo(() => {
-    const symbols = [...new Set(rows.map((row) => row.symbol))].sort();
-    const colors = new Map<string, string>();
-    symbols.forEach((symbol, index) => {
-      const hue = (index * 137.508) % 360;
-      colors.set(symbol, `hsl(${hue}, 70%, 52%)`);
-    });
-    return colors;
-  }, [rows]);
-
-  const colorForSymbol = (symbol: string) => colorBySymbol.get(symbol) ?? "var(--muted)";
+  const colorBySymbol = useMemo(
+    () => createAssetColorMap(rows.map((row) => row.symbol)),
+    [rows],
+  );
   const arsRows = rows.filter((r) => r.currency === "ARS");
   const usdRows = rows.filter((r) => r.currency === "USD");
   const totalArsValue = arsRows.reduce((s, r) => s + r.value, 0);
@@ -171,7 +165,7 @@ function MisInversiones() {
                         <PieChart>
                           <Pie data={chart.data} dataKey="value" nameKey="name" innerRadius={55} outerRadius={100} paddingAngle={2} stroke="none">
                             {chart.data.map((entry) => (
-                              <Cell key={entry.name} fill={colorForSymbol(entry.name)} />
+                              <Cell key={entry.name} fill={getAssetColor(colorBySymbol, entry.name)} />
                             ))}
                           </Pie>
                           <Tooltip
@@ -192,7 +186,7 @@ function MisInversiones() {
                   return (
                     <li key={r.symbol} className="flex items-center justify-between gap-4">
                       <span className="flex min-w-0 items-center gap-2">
-                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: colorForSymbol(r.symbol) }} />
+                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: getAssetColor(colorBySymbol, r.symbol) }} />
                         <b className="shrink-0">{r.symbol}</b>
                         <span className="truncate text-muted-foreground">{r.name}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">{r.currency}</span>

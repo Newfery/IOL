@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
 import { createMovimiento, getAssets, getCuenta, getDolarQuotes, getPortfolio, type Asset, type Cuenta, type DolarQuotes, type Holding } from "@/lib/api";
+import { createAssetColorMap, getAssetColor } from "@/lib/asset-colors";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -30,7 +31,6 @@ export const Route = createFileRoute("/")({
 type Moneda = "ARS" | "MEP" | "CCL";
 const ars = (n: number) => n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 2 });
 const usd = (n: number) => `US$ ${n.toLocaleString("es-AR", { maximumFractionDigits: 2 })}`;
-const COLORS = ["var(--primary)", "var(--chart-4)", "var(--chart-1)", "var(--chart-2)", "var(--loss)"];
 
 function Home() {
   const { user } = useAuth();
@@ -99,7 +99,11 @@ function Home() {
       : conversionRate !== null && conversionRate > 0
         ? usd(totalArs / conversionRate)
         : "—";
-  const pieData = rows.filter((r) => r.pnlArs > 0).map((r) => ({ name: r.symbol, value: r.pnlArs }));
+  const pieData = rows.map((r) => ({ name: r.symbol, value: r.valueArs }));
+  const colorBySymbol = useMemo(
+    () => createAssetColorMap(rows.map((row) => row.symbol)),
+    [rows],
+  );
 
   function openMoneyDialog(action: "deposit" | "withdraw") {
     setMoneyAction(action);
@@ -217,12 +221,14 @@ function Home() {
             <>
               <div className="grid items-center gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:gap-12">
                 <div className="min-w-0">
-                  <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Rendimientos por activo</h3>
-                  <div className="h-80 w-full md:h-96" aria-label="Gráfico de rendimientos por activo">
+                  <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Composición por valor actual</h3>
+                  <div className="h-80 w-full md:h-96" aria-label="Composición de cartera por activo">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={pieData} dataKey="value" nameKey="name" innerRadius="48%" outerRadius="85%" paddingAngle={2} stroke="none" isAnimationActive={false}>
-                          {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        <Pie data={pieData} dataKey="value" nameKey="name" innerRadius="48%" outerRadius="85%" paddingAngle={0} minAngle={8} stroke="var(--background)" strokeWidth={2} isAnimationActive={false}>
+                          {pieData.map((entry) => (
+                            <Cell key={entry.name} fill={getAssetColor(colorBySymbol, entry.name)} />
+                          ))}
                         </Pie>
                         <Tooltip formatter={(v: number) => ars(v)}
                           contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)" }}
@@ -233,11 +239,10 @@ function Home() {
                 </div>
                 <ul className="w-full divide-y divide-border text-sm" aria-label="Rendimiento de mis activos">
                   {rows.map((r) => {
-                    const idx = pieData.findIndex((p) => p.name === r.symbol);
                     return (
                       <li key={r.symbol} className="flex items-center justify-between gap-4 py-5">
                         <span className="flex min-w-0 items-center gap-3">
-                          <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: idx >= 0 ? COLORS[idx % COLORS.length] : "var(--muted)" }} />
+                          <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: getAssetColor(colorBySymbol, r.symbol) }} />
                           <span className="min-w-0">
                             <Link
                               to="/activos/$symbol"
