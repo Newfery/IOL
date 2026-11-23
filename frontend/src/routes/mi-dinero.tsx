@@ -4,15 +4,23 @@ import { Eye, EyeOff } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/lib/auth";
-import { getBalance, getDolarQuotes, getPlazos, getOrdenesPendientes, type DolarQuotes } from "@/lib/api";
+import {
+  getBalance,
+  getDolarQuotes,
+  getPlazos,
+  getOrdenesPendientes,
+  getPortfolio,
+  type DolarQuotes,
+  type Holding,
+} from "@/lib/api";
 
 export const Route = createFileRoute("/mi-dinero")({
   head: () => ({
     meta: [
       { title: "Invertix — Mi dinero" },
-      { name: "description", content: "Tu dinero disponible, los plazos de tu dinero y el dinero comprometido en operaciones pendientes." },
+      { name: "description", content: "Tu dinero disponible, plazos y dinero invertido en activos." },
       { property: "og:title", content: "Invertix — Mi dinero" },
-      { property: "og:description", content: "Disponible, plazos y dinero comprometido de tu cuenta." },
+      { property: "og:description", content: "Disponible, plazos y dinero invertido en activos." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -37,12 +45,14 @@ function MiDinero() {
   const [oculto, setOculto] = useState(false);
   const [plazos, setPlazos] = useState<Awaited<ReturnType<typeof getPlazos>>>([]);
   const [pendientes, setPendientes] = useState<Awaited<ReturnType<typeof getOrdenesPendientes>>>([]);
+  const [cartera, setCartera] = useState<Holding[] | null>(null);
+  const [comprometidoReady, setComprometidoReady] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) return;
-    Promise.allSettled([getBalance(), getDolarQuotes(), getPlazos(), getOrdenesPendientes()])
-      .then(([b, q, p, o]) => {
+    Promise.allSettled([getBalance(), getDolarQuotes(), getPlazos(), getOrdenesPendientes(), getPortfolio()])
+      .then(([b, q, p, o, h]) => {
         if (b.status === "fulfilled") setBalance(b.value);
         if (q.status === "fulfilled") {
           setQuotes(q.value);
@@ -50,7 +60,9 @@ function MiDinero() {
         }
         if (p.status === "fulfilled") setPlazos(p.value);
         if (o.status === "fulfilled") setPendientes(o.value);
-        const failed = [b, q, p, o].find((result) => result.status === "rejected");
+        if (h.status === "fulfilled") setCartera(h.value);
+        setComprometidoReady(o.status === "fulfilled" && h.status === "fulfilled");
+        const failed = [b, q, p, o, h].find((result) => result.status === "rejected");
         if (failed?.status === "rejected") setError((failed.reason as Error).message);
       });
   }, [user]);
@@ -61,8 +73,18 @@ function MiDinero() {
   const monto = (a: number, u: number) => (moneda === "ARS" ? a : u);
   const ocultar = (s: string) => (oculto ? s.replace(/[0-9]/g, "*") : s);
 
-  const comprometidoArs = pendientes.reduce((s, p) => s + p.ars, 0);
-  const comprometidoUsd = pendientes.reduce((s, p) => s + p.usd, 0);
+  const invertidoArs = cartera?.reduce(
+    (total, holding) => total + (holding.currency === "ARS" ? holding.qty * holding.avgPrice : 0),
+    0,
+  ) ?? 0;
+  const invertidoUsd = cartera?.reduce(
+    (total, holding) => total + (holding.currency === "USD" ? holding.qty * holding.avgPrice : 0),
+    0,
+  ) ?? 0;
+  const comprometidoArs = invertidoArs + pendientes.reduce((s, p) => s + p.ars, 0);
+  const comprometidoUsd = invertidoUsd + pendientes.reduce((s, p) => s + p.usd, 0);
+  const tenenciasEnMoneda = cartera?.filter((holding) => holding.currency === moneda) ?? [];
+  const pendientesEnMoneda = pendientes.filter((pending) => monto(pending.ars, pending.usd) > 0);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -124,19 +146,27 @@ function MiDinero() {
         <section className="rounded-xl border border-border bg-card">
           <div className="border-b border-border p-4">
             <h2 className="font-display text-lg font-semibold">Dinero comprometido</h2>
-            <p className="text-xs text-muted-foreground">Por operaciones pendientes</p>
+            <p className="text-xs text-muted-foreground">Invertido en activos a precio promedio y operaciones pendientes</p>
           </div>
           <div className="p-4">
-            <p className="font-display text-2xl font-semibold">{ocultar(fmt(monto(comprometidoArs, comprometidoUsd)))}</p>
+            <p className="font-display text-2xl font-semibold">
+              {comprometidoReady ? ocultar(fmt(monto(comprometidoArs, comprometidoUsd))) : "—"}
+            </p>
             <ul className="mt-4 space-y-2">
-              {pendientes.filter((p) => monto(p.ars, p.usd) > 0).map((p) => (
+              {tenenciasEnMoneda.map((holding) => (
+                <li key={`holding-${holding.symbol}`} className="flex items-center justify-between rounded-lg bg-muted px-4 py-3 text-sm">
+                  <span>{holding.symbol} · {holding.qty} unidades</span>
+                  <span className="font-mono">{ocultar(fmt(holding.qty * holding.avgPrice))}</span>
+                </li>
+              ))}
+              {pendientesEnMoneda.map((p) => (
                 <li key={p.desc} className="flex items-center justify-between rounded-lg bg-muted px-4 py-3 text-sm">
                   <span>{p.desc}</span>
                   <span className="font-mono">{ocultar(fmt(monto(p.ars, p.usd)))}</span>
                 </li>
               ))}
-              {pendientes.every((p) => monto(p.ars, p.usd) === 0) && (
-                <li className="py-4 text-center text-sm text-muted-foreground">No tenés operaciones pendientes en esta moneda.</li>
+              {comprometidoReady && tenenciasEnMoneda.length === 0 && pendientesEnMoneda.length === 0 && (
+                <li className="py-4 text-center text-sm text-muted-foreground">No tenés inversiones ni operaciones pendientes en esta moneda.</li>
               )}
             </ul>
           </div>
