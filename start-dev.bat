@@ -36,8 +36,8 @@ exit /b
 
 :run_frontend
 cd /d "%~dp0frontend"
-rem Match the backend bind address to avoid localhost resolving to IPv6 (::1).
-set "VITE_API_URL=http://127.0.0.1:8000"
+rem Use the frontend origin so other devices reach the API through Vite's proxy.
+set "VITE_API_URL="
 set "PORTABLE_NODE=%~dp0.local-node\node-v26.13.1-win-x64"
 if exist "%PORTABLE_NODE%\node.exe" set "PATH=%PORTABLE_NODE%;%PATH%"
 if exist "node_modules\.bin\vite.cmd" (

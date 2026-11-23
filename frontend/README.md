@@ -23,6 +23,12 @@ npm i
 npm run dev
 ```
 
-For the local API, copy `.env.example` to `.env.local` and run the backend on
-`http://localhost:8000`. Set the backend `CORS_ORIGINS` value if the frontend
-uses a different origin.
+For local development, leave `VITE_API_URL` empty and run the backend on
+`http://127.0.0.1:8000`. Vite proxies `/api` requests to the backend, so the
+browser uses the frontend's origin and does not need cross-origin CORS access.
+
+On Windows, run `start-dev.bat` from the repository root. From another device
+on the same network, open `http://<IP-LAN-de-esta-PC>:5173`. If the page cannot
+be reached, allow the frontend's port through Windows Firewall on the private
+network. Do not set `VITE_API_URL` to `127.0.0.1` for this setup: that address
+would refer to the other device itself.
