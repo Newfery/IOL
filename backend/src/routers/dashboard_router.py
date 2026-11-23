@@ -62,7 +62,8 @@ def _group_payload(db: Session, group: GrupoDeInversion) -> dict:
         }
                     for _, investor in memberships],
         "holdings": [{"symbol": asset.ticker, "qty": float(holding.cantidad),
-                      "avgPrice": float(holding.precio_promedio)} for holding, asset in holdings],
+                      "avgPrice": float(holding.precio_promedio),
+                      "currency": asset.moneda} for holding, asset in holdings],
     }
 
 
@@ -344,14 +345,22 @@ def group_operation(group_id: int, payload: GroupOperationRequest, db: Session =
     quantity = payload.cantidad
     asset = db.query(Activo).filter(Activo.ticker == ticker, Activo.activo.is_(True)).first()
     if asset is None: raise NotFoundError("Activo no encontrado")
-    if str(asset.moneda) != "ARS":
-        raise HTTPException(
-            status_code=400,
-            detail="Las operaciones grupales solo admiten activos en ARS",
-        )
     if quantity <= 0: raise HTTPException(status_code=422, detail="La cantidad debe ser mayor a cero")
-    price = Decimal(str(asset.precio_actual)); gross = quantity * price
-    total = (gross * Decimal("1.005")).quantize(Decimal("0.01"))
+    price = Decimal(str(asset.precio_actual))
+    gross = quantity * price
+    gross_ars = gross
+    if str(asset.moneda) == "USD":
+        mep = _dolar_rate(db, None, "AL30", "AL30D", "mep")
+        if mep is None or mep <= 0:
+            raise HTTPException(
+                status_code=503,
+                detail="No hay una cotización MEP disponible para comprar este activo",
+            )
+        gross_ars *= Decimal(str(mep))
+    total = (gross_ars * Decimal("1.005")).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
     if Decimal(str(group.plata_disponible)) < total:
         raise HTTPException(status_code=400, detail="El pozo del grupo no alcanza")
     holding = db.query(TenenciaGrupo).filter_by(grupo_id=group_id, activo_id=asset.id).first()

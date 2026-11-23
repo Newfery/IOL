@@ -14,8 +14,9 @@ from src.db.models.cuenta_model import Cuenta
 from src.db.models.grupo_de_inversion_model import GrupoDeInversion
 from src.db.models.grupo_inversor_model import GrupoInversor
 from src.db.models.inversor_model import Inversor
-from src.routers.dashboard_router import contribute_group, my_groups
-from src.schemas.frontend_schema import GroupContributionRequest
+from src.db.models.tenencia_grupo_model import TenenciaGrupo
+from src.routers.dashboard_router import contribute_group, group_operation, my_groups
+from src.schemas.frontend_schema import GroupContributionRequest, GroupOperationRequest
 from src.services.dolar_service import DolarQuoteError
 
 
@@ -71,6 +72,68 @@ class GroupContributionRouteTests(unittest.TestCase):
         self.assertEqual(len(groups), 1)
         self.assertEqual(groups[0]["id"], str(self.group_id))
         self.assertEqual(groups[0]["members"][0]["contributedUsd"], 0)
+
+    def test_group_buys_usd_asset_using_mep_and_returns_holding_currency(self):
+        asset = Activo(
+            ticker="ETF.US",
+            nombre="ETF en dólares",
+            tipo="etf",
+            moneda="USD",
+            precio_actual=Decimal("10.00"),
+            variacion_porcentual=Decimal("0"),
+            nivel_riesgo=3,
+            activo=True,
+        )
+        self.group.plata_disponible = Decimal("50000.00")
+        self.db.add(asset)
+        self.db.commit()
+
+        with patch(
+            "src.routers.dashboard_router._dolar_rate",
+            return_value=Decimal("1500"),
+        ) as quote_mock:
+            response = group_operation(
+                self.group_id,
+                GroupOperationRequest(ticker="ETF.US", cantidad=Decimal("2")),
+                self.db,
+                self.investor,
+            )
+
+        self.assertEqual(response["cash"], 19850)
+        self.assertEqual(
+            response["holdings"],
+            [{"symbol": "ETF.US", "qty": 2, "avgPrice": 10, "currency": "USD"}],
+        )
+        quote_mock.assert_called_once_with(self.db, None, "AL30", "AL30D", "mep")
+
+    def test_group_does_not_buy_usd_asset_without_mep_quote(self):
+        asset = Activo(
+            ticker="ETF.US",
+            nombre="ETF en dólares",
+            tipo="etf",
+            moneda="USD",
+            precio_actual=Decimal("10.00"),
+            variacion_porcentual=Decimal("0"),
+            nivel_riesgo=3,
+            activo=True,
+        )
+        self.group.plata_disponible = Decimal("50000.00")
+        self.db.add(asset)
+        self.db.commit()
+
+        with patch("src.routers.dashboard_router._dolar_rate", return_value=None):
+            with self.assertRaises(HTTPException) as context:
+                group_operation(
+                    self.group_id,
+                    GroupOperationRequest(ticker="ETF.US", cantidad=Decimal("2")),
+                    self.db,
+                    self.investor,
+                )
+
+        self.assertEqual(context.exception.status_code, 503)
+        self.db.refresh(self.group)
+        self.assertEqual(self.group.plata_disponible, Decimal("50000.00"))
+        self.assertEqual(self.db.query(TenenciaGrupo).count(), 0)
 
     @patch("src.routers.dashboard_router.OperacionService.acreditar_liquidaciones_vencidas")
     @patch("src.routers.dashboard_router.DolarQuoteService.obtener")

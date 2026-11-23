@@ -19,9 +19,9 @@ export const Route = createFileRoute("/grupos")({
   head: () => ({
     meta: [
       { title: "Grupos de inversión — Invertix" },
-      { name: "description", content: "Creá o unite a un grupo con amigos, junten plata y compren acciones entre todos." },
+      { name: "description", content: "Creá o unite a un grupo con amigos, junten plata y compren activos entre todos." },
       { property: "og:title", content: "Grupos de inversión — Invertix" },
-      { property: "og:description", content: "Invertí en equipo: un pozo común para comprar acciones con tus amigos." },
+      { property: "og:description", content: "Invertí en equipo: un pozo común para comprar activos con tus amigos." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -73,10 +73,9 @@ function Grupos() {
 
   useEffect(() => {
     refresh();
-    getAssets().then((assets) => {
-      const arsAssets = assets.filter((asset) => asset.currency === "ARS");
-      setAssets(arsAssets);
-      setSymbol(arsAssets[0]?.symbol ?? "");
+    getAssets().then((availableAssets) => {
+      setAssets(availableAssets);
+      setSymbol(availableAssets[0]?.symbol ?? "");
     }).catch((error: unknown) => {
       setAssetsError(error instanceof Error ? error.message : "No se pudieron cargar los activos.");
     });
@@ -90,6 +89,31 @@ function Grupos() {
   const group = groups.find((g) => g.id === activeId) ?? null;
   const asset = assets.find((a) => a.symbol === symbol);
   const totalPool = group ? group.members.reduce((s, m) => s + m.contributed, 0) : 0;
+  const exchangeRate = mep !== null && mep > 0 ? mep : null;
+  const portfolioTotals = group?.holdings.reduce(
+    (totals, holding) => {
+      const currentPrice =
+        assets.find((item) => item.symbol === holding.symbol)?.price ?? holding.avgPrice;
+      const marketValue = currentPrice * holding.qty;
+      if (holding.currency === "ARS") {
+        if (totals.ars !== null) totals.ars += marketValue;
+        if (exchangeRate === null) totals.usd = null;
+        else if (totals.usd !== null) totals.usd += marketValue / exchangeRate;
+      } else {
+        if (totals.usd !== null) totals.usd += marketValue;
+        if (exchangeRate === null) totals.ars = null;
+        else if (totals.ars !== null) totals.ars += marketValue * exchangeRate;
+      }
+      return totals;
+    },
+    { ars: 0 as number | null, usd: 0 as number | null },
+  ) ?? { ars: 0, usd: 0 };
+  const estimatedBuyTotalARS =
+    !asset
+      ? null
+      : asset.currency === "USD"
+        ? exchangeRate === null ? null : asset.price * qty * exchangeRate * 1.005
+        : asset.price * qty * 1.005;
 
   async function onCreate() {
     if (!newName.trim()) return setMsg("Poné un nombre para el grupo.");
@@ -149,7 +173,7 @@ function Grupos() {
         <div>
           <h1 className="font-display text-3xl font-bold">Grupos de inversión</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Juntá plata con amigos o conocidos y compren acciones entre todos.
+            Juntá plata con amigos o conocidos y compren activos entre todos.
           </p>
         </div>
 
@@ -266,31 +290,73 @@ function Grupos() {
                   {assetsError && <p role="alert" className="mt-2 text-sm text-loss">{assetsError}</p>}
                   <select value={symbol} onChange={(e) => setSymbol(e.target.value)}
                     className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    {assets.map((a) => <option key={a.symbol} value={a.symbol}>{a.symbol} — {a.name}</option>)}
+                    {assets.map((a) => <option key={a.symbol} value={a.symbol}>{a.symbol} — {a.name} ({a.currency})</option>)}
                   </select>
                   <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
                     className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
                   <div className="mt-3 flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total + comisión 0,5%</span>
-                    <span className="font-mono">{asset && fmt(asset.price * qty * 1.005)}</span>
+                    <span className="text-muted-foreground">Total estimado en ARS + comisión 0,5%</span>
+                    <span className="font-mono">
+                      {estimatedBuyTotalARS === null ? "—" : fmt(estimatedBuyTotalARS)}
+                    </span>
                   </div>
+                  {asset?.currency === "USD" && exchangeRate === null && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {quoteError || "No hay una cotización MEP disponible para estimar la compra."}
+                    </p>
+                  )}
                   <button onClick={onBuy} className="mt-4 w-full rounded-md bg-gain py-2 font-semibold text-background">Comprar para el grupo</button>
                 </div>
               </div>
 
               <div className="rounded-xl border border-border bg-card p-5">
                 <h2 className="font-display text-lg font-semibold">Cartera del grupo</h2>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Stat
+                    label="Valor estimado en ARS"
+                    value={portfolioTotals.ars === null ? "No disponible" : fmt(portfolioTotals.ars)}
+                  />
+                  <Stat
+                    label="Valor estimado en USD"
+                    value={portfolioTotals.usd === null ? "No disponible" : fmtUsd(portfolioTotals.usd)}
+                  />
+                </div>
+                {exchangeRate === null && group.holdings.length > 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {quoteError || "No hay una cotización MEP disponible para convertir todos los activos."}
+                  </p>
+                )}
+                {exchangeRate !== null && group.holdings.length > 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Valores convertidos al MEP de {fmt(exchangeRate)}.
+                  </p>
+                )}
                 {group.holdings.length === 0 ? (
                   <p className="mt-2 text-sm text-muted-foreground">Todavía no compraron nada.</p>
                 ) : (
                   <ul className="mt-3 space-y-2 text-sm">
                     {group.holdings.map((h) => {
                       const p = assets.find((a) => a.symbol === h.symbol)?.price ?? h.avgPrice;
-                      const pnl = ((p - h.avgPrice) / h.avgPrice) * 100;
+                      const marketValue = p * h.qty;
+                      const valueARS = h.currency === "ARS"
+                        ? marketValue
+                        : exchangeRate === null ? null : marketValue * exchangeRate;
+                      const valueUSD = h.currency === "USD"
+                        ? marketValue
+                        : exchangeRate === null ? null : marketValue / exchangeRate;
+                      const pnl = h.avgPrice > 0 ? ((p - h.avgPrice) / h.avgPrice) * 100 : 0;
                       return (
-                        <li key={h.symbol} className="flex justify-between">
-                          <span><b>{h.symbol}</b> <span className="text-muted-foreground">x{h.qty}</span></span>
-                          <span className="font-mono">{fmt(p * h.qty)} <span className={pnl >= 0 ? "text-gain" : "text-loss"}>{pnl.toFixed(1)}%</span></span>
+                        <li key={h.symbol} className="flex justify-between gap-4 border-t border-border pt-3">
+                          <span className="shrink-0">
+                            <b>{h.symbol}</b> <span className="text-muted-foreground">x{h.qty}</span>
+                          </span>
+                          <span className="text-right font-mono">
+                            <span className="block">{valueARS === null ? "ARS —" : fmt(valueARS)}</span>
+                            <span className="block text-muted-foreground">
+                              {valueUSD === null ? "USD —" : fmtUsd(valueUSD)}
+                            </span>
+                            <span className={pnl >= 0 ? "text-gain" : "text-loss"}>{pnl.toFixed(1)}%</span>
+                          </span>
                         </li>
                       );
                     })}
