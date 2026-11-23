@@ -65,6 +65,10 @@ desde `backend/`:
 .\venv\Scripts\python.exe -m src.db.seeders.yfinance_assets
 ```
 
+La API también ejecuta esta sincronización una vez al arrancar, en segundo
+plano para no retrasar el inicio del servicio. Si Yahoo Finance no responde,
+el error queda registrado en el log y se puede reintentar con el comando manual.
+
 El sincronizador consulta Yahoo Finance, omite símbolos sin cotización, inserta
 los nuevos y actualiza nombre, precio y variación de los existentes sin borrar
 activos ni tenencias. Yahoo no ofrece un catálogo global exhaustivo; esta es una

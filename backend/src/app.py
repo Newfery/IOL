@@ -1,7 +1,7 @@
 import asyncio
 import logging
-from pathlib import Path
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,8 +24,9 @@ from src.routers import (
     operacion_router,
     tenencia_router,
 )
-from src.utils.errors import AppError
+from src.db.seeders.yfinance_assets import sync_assets as sync_yfinance_assets
 from src.services.cafci_service import CafciProviderError, sync_cafci_assets
+from src.utils.errors import AppError
 
 logger = logging.getLogger(__name__)
 CAFCI_REFRESH_SECONDS = 6 * 60 * 60
@@ -41,17 +42,50 @@ async def _refresh_cafci_periodically() -> None:
         await asyncio.sleep(CAFCI_REFRESH_SECONDS)
 
 
+async def _sync_yahoo_assets_on_startup() -> None:
+    inserted, updated, skipped, validated_us_equities = await asyncio.to_thread(
+        sync_yfinance_assets
+    )
+    logger.info(
+        "Sincronización inicial de Yahoo Finance: %s nuevos, %s actualizados, "
+        "%s acciones de EE. UU. validadas y %s símbolos omitidos",
+        inserted,
+        updated,
+        validated_us_equities,
+        len(skipped),
+    )
+
+
+def _log_yahoo_sync_failure(task: asyncio.Task[None]) -> None:
+    if task.cancelled():
+        return
+    error = task.exception()
+    if error is not None:
+        logger.error(
+            "Falló la sincronización inicial de Yahoo Finance",
+            exc_info=(type(error), error, error.__traceback__),
+        )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    task = asyncio.create_task(_refresh_cafci_periodically())
+    cafci_task = asyncio.create_task(_refresh_cafci_periodically())
+    yahoo_task = asyncio.create_task(_sync_yahoo_assets_on_startup())
+    yahoo_task.add_done_callback(_log_yahoo_sync_failure)
     try:
         yield
     finally:
-        task.cancel()
+        cafci_task.cancel()
         try:
-            await task
+            await cafci_task
         except asyncio.CancelledError:
             pass
+        if not yahoo_task.done():
+            yahoo_task.cancel()
+            try:
+                await yahoo_task
+            except asyncio.CancelledError:
+                pass
 
 app = FastAPI(title="Initial Structure API", lifespan=lifespan)
 app.add_middleware(
