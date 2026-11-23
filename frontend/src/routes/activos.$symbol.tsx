@@ -195,6 +195,12 @@ function AssetDetail() {
                         <Tooltip
                           formatter={(value: number) => fmt(value, asset.currency)}
                           labelFormatter={(label) => dateLabel(String(label))}
+                          contentStyle={{
+                            background: "var(--card)",
+                            border: "1px solid var(--border)",
+                            borderRadius: 8,
+                            color: "var(--foreground)",
+                          }}
                         />
                         <Line
                           type="linear"
