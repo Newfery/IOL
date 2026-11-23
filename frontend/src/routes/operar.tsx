@@ -4,7 +4,7 @@ import { Search } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { AssetTable } from "@/components/AssetTable";
 import { RequireAuth } from "@/components/RequireAuth";
-import { getAssets, getPortfolio, type Asset, type Holding } from "@/lib/api";
+import { getAssets, type Asset } from "@/lib/api";
 import { CATEGORIES } from "@/lib/categories";
 import { useAuth } from "@/lib/auth";
 import { useFavorites } from "@/lib/use-favorites";
@@ -27,17 +27,12 @@ export const Route = createFileRoute("/operar")({
   ),
 });
 
-const fmt = (value: number, currency: Asset["currency"]) =>
-  value.toLocaleString("es-AR", { style: "currency", currency, maximumFractionDigits: 2 });
-
 function Investments() {
   const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [holdings, setHoldings] = useState<Holding[]>([]);
   const [search, setSearch] = useState("");
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [assetsError, setAssetsError] = useState("");
-  const [portfolioError, setPortfolioError] = useState("");
   const {
     favorites,
     pendingFavorites,
@@ -59,13 +54,6 @@ function Investments() {
       })
       .finally(() => {
         if (active) setAssetsLoading(false);
-      });
-    getPortfolio()
-      .then((result) => {
-        if (active) setHoldings(result);
-      })
-      .catch((reason: unknown) => {
-        if (active) setPortfolioError(reason instanceof Error ? reason.message : "No se pudo cargar la cartera.");
       });
     return () => {
       active = false;
@@ -132,43 +120,6 @@ function Investments() {
             />
           </section>
         )}
-
-        <section className="max-w-2xl rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="font-display text-lg font-semibold">Mi cartera</h2>
-            <Link to="/mis-inversiones" className="text-sm text-primary hover:underline">Ver detalle</Link>
-          </div>
-          {portfolioError && <p role="alert" className="mt-3 text-sm text-loss">{portfolioError}</p>}
-          {!portfolioError && holdings.length === 0 ? (
-            <p className="mt-3 text-sm text-muted-foreground">Todavía no tenés activos en tu cartera.</p>
-          ) : (
-            <ul className="mt-3 space-y-3 text-sm">
-              {holdings.map((holding) => {
-                const asset = assets.find((item) => item.symbol === holding.symbol);
-                const price = asset?.price ?? holding.avgPrice;
-                const currency = asset?.currency ?? holding.currency;
-                const pnl = holding.avgPrice > 0 ? ((price - holding.avgPrice) / holding.avgPrice) * 100 : 0;
-                return (
-                  <li key={holding.symbol} className="flex justify-between gap-4">
-                    <span>
-                      <Link
-                        to="/activos/$symbol"
-                        params={{ symbol: holding.symbol }}
-                        className="font-semibold hover:text-primary"
-                      >
-                        {holding.symbol}
-                      </Link>
-                      <span className="ml-2 text-muted-foreground">x{holding.qty}</span>
-                    </span>
-                    <span className={`font-mono ${pnl >= 0 ? "text-gain" : "text-loss"}`}>
-                      {fmt(price * holding.qty, currency)} · {pnl.toFixed(1)}%
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
       </main>
     </div>
   );
