@@ -26,7 +26,6 @@ export const Route = createFileRoute("/mis-inversiones")({
 
 const fmt = (n: number, currency: Asset["currency"]) =>
   n.toLocaleString("es-AR", { style: "currency", currency, maximumFractionDigits: 2 });
-const COLORS = ["var(--primary)", "var(--gain)", "var(--chart-3, #f59e0b)", "var(--chart-4, #60a5fa)", "var(--loss)", "var(--chart-5, #a78bfa)"];
 
 function MisInversiones() {
   const { user } = useAuth();
@@ -61,6 +60,17 @@ function MisInversiones() {
     [holdings, assets],
   );
 
+  const colorBySymbol = useMemo(() => {
+    const symbols = [...new Set(rows.map((row) => row.symbol))].sort();
+    const colors = new Map<string, string>();
+    symbols.forEach((symbol, index) => {
+      const hue = (index * 137.508) % 360;
+      colors.set(symbol, `hsl(${hue}, 70%, 52%)`);
+    });
+    return colors;
+  }, [rows]);
+
+  const colorForSymbol = (symbol: string) => colorBySymbol.get(symbol) ?? "var(--muted)";
   const arsRows = rows.filter((r) => r.currency === "ARS");
   const usdRows = rows.filter((r) => r.currency === "USD");
   const totalArsValue = arsRows.reduce((s, r) => s + r.value, 0);
@@ -159,7 +169,9 @@ function MisInversiones() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie data={chart.data} dataKey="value" nameKey="name" innerRadius={55} outerRadius={100} paddingAngle={2} stroke="none">
-                          {chart.data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                          {chart.data.map((entry) => (
+                            <Cell key={entry.name} fill={colorForSymbol(entry.name)} />
+                          ))}
                         </Pie>
                         <Tooltip
                           formatter={(v: number) => fmt(v, chart.currency)}
@@ -174,12 +186,12 @@ function MisInversiones() {
               ))}
             </div>
             <ul className="mx-auto mt-6 max-w-md space-y-3 text-sm">
-              {rows.map((r, i) => {
+              {rows.map((r) => {
                 const currencyTotal = r.currency === "ARS" ? totalArsValue : totalUsdValue;
                 return (
                 <li key={r.symbol} className="flex items-center justify-between">
                   <span className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+                    <span className="h-3 w-3 rounded-full" style={{ background: colorForSymbol(r.symbol) }} />
                     <b>{r.symbol}</b>
                     <span className="text-muted-foreground">{r.name}</span>
                   </span>
