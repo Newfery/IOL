@@ -6,8 +6,8 @@ import { AssetTable } from "@/components/AssetTable";
 import { RequireAuth } from "@/components/RequireAuth";
 import { getAssets, type Asset } from "@/lib/api";
 import { findCategory } from "@/lib/categories";
-
-const FAVORITES_KEY = "invertix_favoritos";
+import { useAuth } from "@/lib/auth";
+import { useFavorites } from "@/lib/use-favorites";
 
 export const Route = createFileRoute("/operar_/$categoria")({
   head: ({ params }) => {
@@ -38,11 +38,20 @@ export const Route = createFileRoute("/operar_/$categoria")({
 function CategoryPage() {
   const { categoria } = Route.useParams();
   const category = findCategory(categoria);
+  const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [favorites, setFavorites] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const {
+    favorites,
+    pendingFavorites,
+    loading: favoritesLoading,
+    error: favoriteActionError,
+    loadError: favoritesLoadError,
+    toggleFavorite,
+  } = useFavorites(user?.id, assets);
+  const favoritesError = favoritesLoadError || favoriteActionError;
 
   useEffect(() => {
     let active = true;
@@ -57,27 +66,10 @@ function CategoryPage() {
         if (active) setLoading(false);
       });
 
-    try {
-      const saved = JSON.parse(localStorage.getItem(FAVORITES_KEY) ?? "[]");
-      if (Array.isArray(saved)) setFavorites(saved.filter((item): item is string => typeof item === "string"));
-    } catch {
-      setFavorites([]);
-    }
-
     return () => {
       active = false;
     };
   }, []);
-
-  function toggleFavorite(symbol: string) {
-    setFavorites((previous) => {
-      const next = previous.includes(symbol)
-        ? previous.filter((item) => item !== symbol)
-        : [...previous, symbol];
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
-      return next;
-    });
-  }
 
   const categoryAssets = category?.type === "Favoritos"
     ? assets.filter((asset) => favorites.includes(asset.symbol))
@@ -93,6 +85,9 @@ function CategoryPage() {
     : query
       ? "No hay activos que coincidan con la búsqueda."
       : "Todavía no hay activos en esta categoría.";
+  const showTable = !loading
+    && !error
+    && !(category?.type === "Favoritos" && (favoritesLoading || favoritesLoadError));
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -122,14 +117,20 @@ function CategoryPage() {
         </section>
 
         {error && <p role="alert" className="text-sm text-loss">{error}</p>}
+        {favoritesError && <p role="alert" className="text-sm text-loss">{favoritesError}</p>}
         {loading && <p role="status" className="text-sm text-muted-foreground">Cargando activos…</p>}
-        {!loading && !error && (
+        {category?.type === "Favoritos" && favoritesLoading && (
+          <p role="status" className="text-sm text-muted-foreground">Cargando favoritos…</p>
+        )}
+        {showTable && (
           <section className="overflow-x-auto rounded-lg border border-border bg-card">
             <AssetTable
               assets={shown}
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
               emptyMessage={emptyMessage}
+              pendingFavorites={pendingFavorites}
+              favoriteActionsDisabled={favoritesLoading || Boolean(favoritesLoadError)}
             />
           </section>
         )}

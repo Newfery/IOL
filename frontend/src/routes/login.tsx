@@ -1,4 +1,4 @@
-import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { login } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -63,6 +63,12 @@ function Login() {
         <button disabled={loading} className="w-full rounded-md bg-primary py-2 font-semibold text-primary-foreground disabled:opacity-60">
           {loading ? "Ingresando..." : "Ingresar"}
         </button>
+        <p className="text-center text-sm text-muted-foreground">
+          ¿No tenés cuenta?{" "}
+          <Link to="/registro" className="font-semibold text-primary hover:underline">
+            Crear cuenta
+          </Link>
+        </p>
       </form>
     </div>
   );

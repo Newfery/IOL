@@ -28,12 +28,24 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export type Moneda = "ARS" | "USD";
-export type Asset = { symbol: string; name: string; price: number; change: number; type: "Acción" | "CEDEAR" | "Bono" | "ETF" | "FCI"; currency: Moneda };
+export type Asset = {
+  id: number;
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  type: "Acción" | "CEDEAR" | "Bono" | "ETF" | "FCI";
+  currency: Moneda;
+};
 export type Holding = { symbol: string; qty: number; avgPrice: number; currency: Moneda };
+export type Favorite = { inversor_id: number; activo_id: number };
 export type Order = { symbol: string; side: "buy" | "sell"; qty: number; price: number };
 export type HistoryPoint = { date: string; price: number };
 export type PerfilRiesgo = "conservador" | "moderado" | "agresivo";
 export type Inversor = { id: number; email: string; nombre: string; cuit: string; perfil_riesgo: PerfilRiesgo; fecha_alta: string };
+export type RegisterInvestorRequest = Pick<Inversor, "email" | "nombre" | "cuit" | "perfil_riesgo"> & {
+  password: string;
+};
 export type Cuenta = { id: number; inversor_id: number; numero_comitente: string; saldo_ars: number; saldo_usd: number };
 export type GroupMember = { name: string; contributed: number; contributedUsd: number };
 export type Group = { id: string; name: string; code: string; members: GroupMember[]; cash: number; holdings: Holding[] };
@@ -53,6 +65,27 @@ export async function login(email: string, password: string): Promise<{ token: s
   if (!token || !result.inversor) throw new Error("La respuesta de autenticación no incluye token e inversor.");
   localStorage.setItem(TOKEN_KEY, token);
   return { token, inversor: result.inversor };
+}
+
+export async function registerInvestor(investor: RegisterInvestorRequest): Promise<Inversor> {
+  return request("/api/inversores/", {
+    method: "POST",
+    body: JSON.stringify(investor),
+  });
+}
+
+export async function getFavoriteAssetIds(inversorId: number): Promise<number[]> {
+  const favorites = await request<Favorite[]>(`/api/favoritos/inversor/${inversorId}`);
+  return favorites.map((favorite) => favorite.activo_id);
+}
+export async function createFavorite(inversorId: number, activoId: number): Promise<Favorite> {
+  return request("/api/favoritos/", {
+    method: "POST",
+    body: JSON.stringify({ inversor_id: inversorId, activo_id: activoId }),
+  });
+}
+export async function deleteFavorite(inversorId: number, activoId: number): Promise<void> {
+  return request(`/api/favoritos/${inversorId}/${activoId}`, { method: "DELETE" });
 }
 
 export async function getCuenta(inversorId: number): Promise<Cuenta> { return request(`/api/inversores/${inversorId}/cuenta`); }

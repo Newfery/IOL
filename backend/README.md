@@ -104,8 +104,9 @@ Para instalaciones existentes, aplicar en orden las migraciones
 [`002_grupos_dashboard.sql`](src/db/migrations/002_grupos_dashboard.sql) y
 [`003_operacion_liquidacion.sql`](src/db/migrations/003_operacion_liquidacion.sql),
 [`004_users.sql`](src/db/migrations/004_users.sql) y
-[`005_us_assets_catalog.sql`](src/db/migrations/005_us_assets_catalog.sql) y
-[`006_aporte_grupo_moneda.sql`](src/db/migrations/006_aporte_grupo_moneda.sql).
+[`005_us_assets_catalog.sql`](src/db/migrations/005_us_assets_catalog.sql),
+[`006_aporte_grupo_moneda.sql`](src/db/migrations/006_aporte_grupo_moneda.sql) y
+[`007_favoritos.sql`](src/db/migrations/007_favoritos.sql).
 La migración conserva los inversores actuales sin asignarles contraseñas.
 Configurar `PASSWORD_FINGERPRINT_SECRET` con un secreto estable y distinto de
 `JWT_SECRET`; si se omite, se deriva del `JWT_SECRET` configurado.

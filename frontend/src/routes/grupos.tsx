@@ -1,6 +1,7 @@
 import { RequireAuth } from "@/components/RequireAuth";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { ArrowLeftRight } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import {
   contributeToGroup,
@@ -48,6 +49,7 @@ function Grupos() {
   const [joinPass, setJoinPass] = useState("");
   const [amount, setAmount] = useState(10000);
   const [currency, setCurrency] = useState<Moneda>("ARS");
+  const [summaryCurrency, setSummaryCurrency] = useState<Moneda>("ARS");
   const [mep, setMep] = useState<number | null>(null);
   const [quoteError, setQuoteError] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -90,25 +92,13 @@ function Grupos() {
   const asset = assets.find((a) => a.symbol === symbol);
   const totalPool = group ? group.members.reduce((s, m) => s + m.contributed, 0) : 0;
   const exchangeRate = mep !== null && mep > 0 ? mep : null;
-  const portfolioTotals = group?.holdings.reduce(
-    (totals, holding) => {
-      const currentPrice =
-        assets.find((item) => item.symbol === holding.symbol)?.price ?? holding.avgPrice;
-      const marketValue = currentPrice * holding.qty;
-      if (holding.currency === "ARS") {
-        if (totals.ars !== null) totals.ars += marketValue;
-        if (exchangeRate === null) totals.usd = null;
-        else if (totals.usd !== null) totals.usd += marketValue / exchangeRate;
-      } else {
-        if (totals.usd !== null) totals.usd += marketValue;
-        if (exchangeRate === null) totals.ars = null;
-        else if (totals.ars !== null) totals.ars += marketValue * exchangeRate;
-      }
-      return totals;
-    },
-    { ars: 0 as number | null, usd: 0 as number | null },
-  ) ?? { ars: 0, usd: 0 };
-  const estimatedBuyTotalARS =
+  const formatSummaryAmount = (value: number) =>
+    summaryCurrency === "ARS"
+      ? fmt(value)
+      : exchangeRate === null ? "No disponible" : fmtUsd(value / exchangeRate);
+  const estimatedBuyTotal =
+    asset ? asset.price * qty * 1.005 : null;
+  const estimatedBuyDebitARS =
     !asset
       ? null
       : asset.currency === "USD"
@@ -232,15 +222,30 @@ function Grupos() {
 
           {group && (
             <div className="space-y-6 lg:col-span-3">
-              <div className="grid gap-4 md:grid-cols-3">
-                <Stat label="Pozo disponible (ARS)" value={fmt(group.cash)} />
-                <Stat
-                  label="Pozo disponible (USD)"
-                  value={exchangeRate === null ? "No disponible" : fmtUsd(group.cash / exchangeRate)}
-                />
-                <Stat label="Total aportado (ARS)" value={fmt(totalPool)} />
+              <div className="space-y-3">
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    aria-label={`Mostrar pozo y total aportado en ${summaryCurrency === "ARS" ? "USD" : "ARS"}`}
+                    onClick={() => setSummaryCurrency((value) => value === "ARS" ? "USD" : "ARS")}
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition hover:scale-[1.02] hover:bg-primary/90 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <ArrowLeftRight className="size-4" aria-hidden="true" />
+                    Ver en {summaryCurrency === "ARS" ? "USD" : "ARS"}
+                  </button>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Stat
+                    label={`Pozo disponible (${summaryCurrency})`}
+                    value={formatSummaryAmount(group.cash)}
+                  />
+                  <Stat
+                    label={`Total aportado (${summaryCurrency})`}
+                    value={formatSummaryAmount(totalPool)}
+                  />
+                </div>
               </div>
-              {exchangeRate === null && group.cash > 0 && (
+              {summaryCurrency === "USD" && exchangeRate === null && (
                 <p role="status" className="text-xs text-muted-foreground">
                   {quoteError || "No hay una cotización MEP disponible para mostrar el pozo en USD."}
                 </p>
@@ -308,14 +313,26 @@ function Grupos() {
                   <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
                     className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
                   <div className="mt-3 flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total estimado en ARS + comisión 0,5%</span>
+                    <span className="text-muted-foreground">
+                      Total estimado en {asset?.currency ?? "ARS"} + comisión 0,5%
+                    </span>
                     <span className="font-mono">
-                      {estimatedBuyTotalARS === null ? "—" : fmt(estimatedBuyTotalARS)}
+                      {estimatedBuyTotal === null
+                        ? "—"
+                        : asset?.currency === "USD" ? fmtUsd(estimatedBuyTotal) : fmt(estimatedBuyTotal)}
                     </span>
                   </div>
+                  {asset?.currency === "USD" && (
+                    <div className="mt-2 flex justify-between gap-3 text-xs">
+                      <span className="text-muted-foreground">Débito aproximado del pozo (ARS)</span>
+                      <span className="font-mono">
+                        {estimatedBuyDebitARS === null ? "No disponible" : fmt(estimatedBuyDebitARS)}
+                      </span>
+                    </div>
+                  )}
                   {asset?.currency === "USD" && exchangeRate === null && (
                     <p className="mt-2 text-xs text-muted-foreground">
-                      {quoteError || "No hay una cotización MEP disponible para estimar la compra."}
+                      {quoteError || "No hay una cotización MEP disponible para estimar el débito en ARS."}
                     </p>
                   )}
                   <button onClick={onBuy} className="mt-4 w-full rounded-md bg-gain py-2 font-semibold text-background">Comprar para el grupo</button>
@@ -324,26 +341,6 @@ function Grupos() {
 
               <div className="rounded-xl border border-border bg-card p-5">
                 <h2 className="font-display text-lg font-semibold">Cartera del grupo</h2>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <Stat
-                    label="Valor estimado en ARS"
-                    value={portfolioTotals.ars === null ? "No disponible" : fmt(portfolioTotals.ars)}
-                  />
-                  <Stat
-                    label="Valor estimado en USD"
-                    value={portfolioTotals.usd === null ? "No disponible" : fmtUsd(portfolioTotals.usd)}
-                  />
-                </div>
-                {exchangeRate === null && group.holdings.length > 0 && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {quoteError || "No hay una cotización MEP disponible para convertir todos los activos."}
-                  </p>
-                )}
-                {exchangeRate !== null && group.holdings.length > 0 && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Valores convertidos al MEP de {fmt(exchangeRate)}.
-                  </p>
-                )}
                 {group.holdings.length === 0 ? (
                   <p className="mt-2 text-sm text-muted-foreground">Todavía no compraron nada.</p>
                 ) : (

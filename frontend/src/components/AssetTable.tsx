@@ -11,11 +11,15 @@ export function AssetTable({
   favorites,
   onToggleFavorite,
   emptyMessage,
+  pendingFavorites = [],
+  favoriteActionsDisabled = false,
 }: {
   assets: Asset[];
   favorites: string[];
-  onToggleFavorite: (symbol: string) => void;
+  onToggleFavorite: (symbol: string) => void | Promise<void>;
   emptyMessage: string;
+  pendingFavorites?: string[];
+  favoriteActionsDisabled?: boolean;
 }) {
   return (
     <table className="w-full text-sm">
@@ -43,6 +47,7 @@ export function AssetTable({
                 type="button"
                 variant="ghost"
                 size="icon"
+                disabled={favoriteActionsDisabled || pendingFavorites.includes(asset.symbol)}
                 onClick={() => onToggleFavorite(asset.symbol)}
                 aria-label={`${favorites.includes(asset.symbol) ? "Quitar" : "Marcar"} ${asset.symbol} ${favorites.includes(asset.symbol) ? "de" : "como"} favorito`}
                 className="relative z-10 text-muted-foreground hover:text-primary"

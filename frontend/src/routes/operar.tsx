@@ -6,8 +6,8 @@ import { AssetTable } from "@/components/AssetTable";
 import { RequireAuth } from "@/components/RequireAuth";
 import { getAssets, getPortfolio, type Asset, type Holding } from "@/lib/api";
 import { CATEGORIES } from "@/lib/categories";
-
-const FAVORITES_KEY = "invertix_favoritos";
+import { useAuth } from "@/lib/auth";
+import { useFavorites } from "@/lib/use-favorites";
 
 export const Route = createFileRoute("/operar")({
   head: () => ({
@@ -31,13 +31,22 @@ const fmt = (value: number, currency: Asset["currency"]) =>
   value.toLocaleString("es-AR", { style: "currency", currency, maximumFractionDigits: 2 });
 
 function Investments() {
+  const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [favorites, setFavorites] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [assetsError, setAssetsError] = useState("");
   const [portfolioError, setPortfolioError] = useState("");
+  const {
+    favorites,
+    pendingFavorites,
+    loading: favoritesLoading,
+    error: favoriteActionError,
+    loadError: favoritesLoadError,
+    toggleFavorite,
+  } = useFavorites(user?.id, assets);
+  const favoritesError = favoritesLoadError || favoriteActionError;
 
   useEffect(() => {
     let active = true;
@@ -58,27 +67,10 @@ function Investments() {
       .catch((reason: unknown) => {
         if (active) setPortfolioError(reason instanceof Error ? reason.message : "No se pudo cargar la cartera.");
       });
-    try {
-      const saved = JSON.parse(localStorage.getItem(FAVORITES_KEY) ?? "[]");
-      if (Array.isArray(saved)) setFavorites(saved.filter((item): item is string => typeof item === "string"));
-    } catch {
-      setFavorites([]);
-    }
-
     return () => {
       active = false;
     };
   }, []);
-
-  function toggleFavorite(symbol: string) {
-    setFavorites((previous) => {
-      const next = previous.includes(symbol)
-        ? previous.filter((item) => item !== symbol)
-        : [...previous, symbol];
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
-      return next;
-    });
-  }
 
   const query = search.trim().toLowerCase();
   const results = assets.filter(
@@ -124,6 +116,7 @@ function Investments() {
 
         {assetsError && <p role="alert" className="text-sm text-loss">{assetsError}</p>}
         {assetsLoading && <p role="status" className="text-sm text-muted-foreground">Cargando activos…</p>}
+        {favoritesError && <p role="alert" className="text-sm text-loss">{favoritesError}</p>}
         {query && !assetsLoading && !assetsError && (
           <section className="overflow-x-auto rounded-xl border border-border bg-card">
             <div className="border-b border-border p-4">
@@ -134,6 +127,8 @@ function Investments() {
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
               emptyMessage="No hay activos que coincidan con la búsqueda."
+              pendingFavorites={pendingFavorites}
+              favoriteActionsDisabled={favoritesLoading || Boolean(favoritesLoadError)}
             />
           </section>
         )}

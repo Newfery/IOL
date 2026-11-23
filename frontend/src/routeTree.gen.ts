@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as MiDineroRouteImport } from './routes/mi-dinero'
 import { Route as MisInversionesRouteImport } from './routes/mis-inversiones'
 import { Route as OperarRouteImport } from './routes/operar'
+import { Route as RegistroRouteImport } from './routes/registro'
 import { Route as ActivosSymbolRouteImport } from './routes/activos.$symbol'
 import { Route as OperarCategoriaRouteImport } from './routes/operar_.$categoria'
 
@@ -48,6 +49,11 @@ const OperarRoute = OperarRouteImport.update({
   path: '/operar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RegistroRoute = RegistroRouteImport.update({
+  id: '/registro',
+  path: '/registro',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ActivosSymbolRoute = ActivosSymbolRouteImport.update({
   id: '/activos/$symbol',
   path: '/activos/$symbol',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/mi-dinero': typeof MiDineroRoute
   '/mis-inversiones': typeof MisInversionesRoute
   '/operar': typeof OperarRoute
+  '/registro': typeof RegistroRoute
   '/activos/$symbol': typeof ActivosSymbolRoute
   '/operar/$categoria': typeof OperarCategoriaRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/mi-dinero': typeof MiDineroRoute
   '/mis-inversiones': typeof MisInversionesRoute
   '/operar': typeof OperarRoute
+  '/registro': typeof RegistroRoute
   '/activos/$symbol': typeof ActivosSymbolRoute
   '/operar/$categoria': typeof OperarCategoriaRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/mi-dinero': typeof MiDineroRoute
   '/mis-inversiones': typeof MisInversionesRoute
   '/operar': typeof OperarRoute
+  '/registro': typeof RegistroRoute
   '/activos/$symbol': typeof ActivosSymbolRoute
   '/operar_/$categoria': typeof OperarCategoriaRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/mi-dinero'
     | '/mis-inversiones'
     | '/operar'
+    | '/registro'
     | '/activos/$symbol'
     | '/operar/$categoria'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/mi-dinero'
     | '/mis-inversiones'
     | '/operar'
+    | '/registro'
     | '/activos/$symbol'
     | '/operar/$categoria'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/mi-dinero'
     | '/mis-inversiones'
     | '/operar'
+    | '/registro'
     | '/activos/$symbol'
     | '/operar_/$categoria'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   MiDineroRoute: typeof MiDineroRoute
   MisInversionesRoute: typeof MisInversionesRoute
   OperarRoute: typeof OperarRoute
+  RegistroRoute: typeof RegistroRoute
   ActivosSymbolRoute: typeof ActivosSymbolRoute
   OperarCategoriaRoute: typeof OperarCategoriaRoute
 }
@@ -178,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OperarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/registro': {
+      id: '/registro'
+      path: '/registro'
+      fullPath: '/registro'
+      preLoaderRoute: typeof RegistroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/activos/$symbol': {
       id: '/activos/$symbol'
       path: '/activos/$symbol'
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   MiDineroRoute: MiDineroRoute,
   MisInversionesRoute: MisInversionesRoute,
   OperarRoute: OperarRoute,
+  RegistroRoute: RegistroRoute,
   ActivosSymbolRoute: ActivosSymbolRoute,
   OperarCategoriaRoute: OperarCategoriaRoute,
 }

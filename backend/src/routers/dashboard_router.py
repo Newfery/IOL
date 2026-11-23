@@ -78,6 +78,7 @@ def market_assets(db: Session = Depends(get_db)):
     }
     return [
         {
+            "id": asset.id,
             "symbol": asset.ticker,
             "name": asset.nombre,
             "price": float(asset.precio_actual),
