@@ -72,6 +72,28 @@ selección amplia, no la totalidad de sus símbolos. Las acciones y ETFs de EE. 
 se guardan en USD con sufijo `.US` para distinguirlos de CEDEARs con el mismo
 ticker.
 
+### Cuotapartes de FCI
+
+Los fondos y sus valores de cuotaparte se importan desde la planilla diaria
+oficial de CAFCI. Al iniciar la API se hace una sincronización y luego se vuelve
+a consultar cada seis horas; CAFCI publica datos diarios, por lo que esto no
+implica una cotización intradiaria. La fecha informada por la fuente se muestra
+en el catálogo. También se puede ejecutar manualmente desde `backend/`:
+
+```powershell
+.\venv\Scripts\python.exe -m src.services.cafci_service
+```
+
+Los FCI se guardan con ticker `FCI-<código CAFCI>` y precisión de seis decimales
+para conservar el valor de cuotaparte. La migración
+[`008_cafci_fci.sql`](src/db/migrations/008_cafci_fci.sql) habilita el tipo FCI,
+amplía la precisión del precio y agrega la fecha de cotización.
+
+La integración de bonos requiere acceso autorizado a la API de renta fija de
+BYMA y su documentación técnica. No se usa un proveedor no oficial ni se
+inventan endpoints; hasta contar con ese acceso, los bonos existentes no se
+actualizan desde esta integración.
+
 ## Funcionalidades del broker
 
 Las rutas de negocio se publican bajo `/api`:
@@ -106,7 +128,8 @@ Para instalaciones existentes, aplicar en orden las migraciones
 [`004_users.sql`](src/db/migrations/004_users.sql) y
 [`005_us_assets_catalog.sql`](src/db/migrations/005_us_assets_catalog.sql),
 [`006_aporte_grupo_moneda.sql`](src/db/migrations/006_aporte_grupo_moneda.sql) y
-[`007_favoritos.sql`](src/db/migrations/007_favoritos.sql).
+[`007_favoritos.sql`](src/db/migrations/007_favoritos.sql) y
+[`008_cafci_fci.sql`](src/db/migrations/008_cafci_fci.sql).
 La migración conserva los inversores actuales sin asignarles contraseñas.
 Configurar `PASSWORD_FINGERPRINT_SECRET` con un secreto estable y distinto de
 `JWT_SECRET`; si se omite, se deriva del `JWT_SECRET` configurado.

@@ -3,8 +3,16 @@ import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Asset } from "@/lib/api";
 
-const fmt = (value: number, currency: Asset["currency"]) =>
-  value.toLocaleString("es-AR", { style: "currency", currency, maximumFractionDigits: 2 });
+const fmt = (asset: Asset) =>
+  asset.price.toLocaleString("es-AR", {
+    style: "currency",
+    currency: asset.currency,
+    maximumFractionDigits: asset.type === "FCI" ? 6 : 2,
+  });
+const quoteDateLabel = (value: string) => {
+  const [year, month, day] = value.slice(0, 10).split("-");
+  return `${day}/${month}/${year}`;
+};
 
 export function AssetTable({
   assets,
@@ -64,9 +72,14 @@ export function AssetTable({
                 {asset.symbol}
               </Link>
               <div className="text-xs text-muted-foreground">{asset.name}</div>
+              {asset.type === "FCI" && asset.quoteDate && (
+                <div className="text-xs text-muted-foreground">
+                  Cuotaparte al {quoteDateLabel(asset.quoteDate)}
+                </div>
+              )}
             </td>
             <td className="p-4 text-muted-foreground">{asset.type}</td>
-            <td className="p-4 text-right font-mono">{fmt(asset.price, asset.currency)}</td>
+            <td className="p-4 text-right font-mono">{fmt(asset)}</td>
             <td className={`p-4 text-right font-mono ${asset.change >= 0 ? "text-gain" : "text-loss"}`}>
               {asset.change >= 0 ? "+" : ""}{asset.change.toFixed(2)}%
             </td>

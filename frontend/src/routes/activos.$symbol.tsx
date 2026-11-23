@@ -32,8 +32,12 @@ export const Route = createFileRoute("/activos/$symbol")({
   ),
 });
 
-const fmt = (value: number, currency: Asset["currency"]) =>
-  value.toLocaleString("es-AR", { style: "currency", currency, maximumFractionDigits: 2 });
+const fmt = (value: number, asset: Asset) =>
+  value.toLocaleString("es-AR", {
+    style: "currency",
+    currency: asset.currency,
+    maximumFractionDigits: asset.type === "FCI" ? 6 : 2,
+  });
 const dateLabel = (value: string) =>
   new Date(`${value.slice(0, 10)}T00:00:00Z`).toLocaleDateString("es-AR", {
     day: "2-digit",
@@ -69,6 +73,8 @@ function AssetDetail() {
           return;
         }
         setAsset(matched);
+
+        if (matched.type === "FCI") return;
 
         try {
           const points = await getHistory(matched.symbol);
@@ -157,16 +163,20 @@ function AssetDetail() {
           <>
             <section className="flex flex-wrap items-start justify-between gap-6 border-b border-border pb-8">
               <div>
-                <p className="mb-2 text-sm text-muted-foreground">{asset.type} · {asset.currency} · Cotización del mercado</p>
+                <p className="mb-2 text-sm text-muted-foreground">
+                  {asset.type} · {asset.currency} · {asset.type === "FCI"
+                    ? `Cuotaparte al ${asset.quoteDate ? dateLabel(asset.quoteDate) : "último dato disponible"}`
+                    : "Cotización del mercado"}
+                </p>
                 <h1 className="font-display text-3xl font-semibold">{asset.symbol}</h1>
                 <p className="mt-1 text-lg text-muted-foreground">{asset.name}</p>
               </div>
               <div className="space-y-3 sm:text-right">
-                <p className="text-sm text-muted-foreground">Precio actual</p>
-                <p className="font-mono text-3xl font-semibold">{fmt(asset.price, asset.currency)}</p>
+                <p className="text-sm text-muted-foreground">{asset.type === "FCI" ? "Valor de cuotaparte" : "Precio actual"}</p>
+                <p className="font-mono text-3xl font-semibold">{fmt(asset.price, asset)}</p>
                 <p className={`flex items-center gap-1 text-sm sm:justify-end ${asset.change >= 0 ? "text-gain" : "text-loss"}`}>
                   {asset.change >= 0 ? <ArrowUpRight className="size-4" /> : <ArrowDownRight className="size-4" />}
-                  {asset.change > 0 ? "+" : ""}{asset.change.toFixed(2)}% hoy
+                  {asset.change > 0 ? "+" : ""}{asset.change.toFixed(2)}% diaria
                 </p>
                 <Button onClick={() => setOrderOpen(true)}>Comprar / Vender</Button>
               </div>
@@ -177,22 +187,26 @@ function AssetDetail() {
                 <div>
                   <h2 className="font-display text-xl font-semibold">Evolución del precio</h2>
                   <p className={`mt-1 font-mono text-sm ${change >= 0 ? "text-gain" : "text-loss"}`}>
-                    {change >= 0 ? "+" : ""}{change.toFixed(2)}% en el período
+                    {asset.type === "FCI"
+                      ? "Cotización diaria"
+                      : `${change >= 0 ? "+" : ""}${change.toFixed(2)}% en el período`}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-1" role="group" aria-label="Rango de tiempo">
-                  {HISTORY_RANGES.map((range) => (
-                    <Button
-                      key={range.days}
-                      size="sm"
-                      variant={days === range.days ? "default" : "ghost"}
-                      aria-pressed={days === range.days}
-                      onClick={() => setDays(range.days)}
-                    >
-                      {range.label}
-                    </Button>
-                  ))}
-                </div>
+                {asset.type !== "FCI" && (
+                  <div className="flex flex-wrap gap-1" role="group" aria-label="Rango de tiempo">
+                    {HISTORY_RANGES.map((range) => (
+                      <Button
+                        key={range.days}
+                        size="sm"
+                        variant={days === range.days ? "default" : "ghost"}
+                        aria-pressed={days === range.days}
+                        onClick={() => setDays(range.days)}
+                      >
+                        {range.label}
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
               {historyError ? (
                 <p role="alert" className="text-sm text-loss">{historyError}</p>
@@ -221,7 +235,7 @@ function AssetDetail() {
                           axisLine={false}
                         />
                         <Tooltip
-                          formatter={(value: number) => fmt(value, asset.currency)}
+                          formatter={(value: number) => fmt(value, asset)}
                           labelFormatter={(label) => dateLabel(String(label))}
                           contentStyle={{
                             background: "var(--card)",
@@ -250,7 +264,11 @@ function AssetDetail() {
                   </p>
                 </>
               ) : (
-                <p className="py-12 text-muted-foreground">No hay cotizaciones históricas disponibles para este período.</p>
+                <p className="py-12 text-muted-foreground">
+                  {asset.type === "FCI"
+                    ? "CAFCI publica el valor de cuotaparte diariamente; el historial no está disponible en esta integración."
+                    : "No hay cotizaciones históricas disponibles para este período."}
+                </p>
               )}
             </section>
 
@@ -262,10 +280,13 @@ function AssetDetail() {
                   ["Nombre", asset.name],
                   ["Tipo", asset.type],
                   ["Moneda", asset.currency],
-                  ["Precio actual", fmt(asset.price, asset.currency)],
+                  [asset.type === "FCI" ? "Valor de cuotaparte" : "Precio actual", fmt(asset.price, asset)],
+                  ...(asset.type === "FCI" && asset.quoteDate
+                    ? [["Fecha de cotización", dateLabel(asset.quoteDate)]]
+                    : []),
                   ["Variación diaria", `${asset.change > 0 ? "+" : ""}${asset.change.toFixed(2)}%`],
-                  ["Mínimo del período", prices.length ? fmt(Math.min(...prices), asset.currency) : "—"],
-                  ["Máximo del período", prices.length ? fmt(Math.max(...prices), asset.currency) : "—"],
+                  ["Mínimo del período", prices.length ? fmt(Math.min(...prices), asset) : "—"],
+                  ["Máximo del período", prices.length ? fmt(Math.max(...prices), asset) : "—"],
                 ].map(([label, value]) => (
                   <div key={label} className="min-w-0">
                     <dt className="text-xs text-muted-foreground">{label}</dt>

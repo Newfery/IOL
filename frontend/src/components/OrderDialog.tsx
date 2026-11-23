@@ -2,8 +2,12 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { placeOrder, type Asset } from "@/lib/api";
 
-const fmt = (value: number, currency: Asset["currency"]) =>
-  value.toLocaleString("es-AR", { style: "currency", currency, maximumFractionDigits: 2 });
+const fmt = (value: number, asset: Asset) =>
+  value.toLocaleString("es-AR", {
+    style: "currency",
+    currency: asset.currency,
+    maximumFractionDigits: asset.type === "FCI" ? 6 : 2,
+  });
 
 export function OrderDialog({ asset, onClose }: { asset: Asset; onClose: () => void }) {
   const [side, setSide] = useState<"buy" | "sell">("buy");
@@ -47,7 +51,7 @@ export function OrderDialog({ asset, onClose }: { asset: Asset; onClose: () => v
         <div className="flex items-start justify-between">
           <div>
             <h2 id="order-dialog-title" className="font-display text-lg font-semibold">Operar {asset.symbol}</h2>
-            <p className="text-sm text-muted-foreground">{asset.name} · {fmt(asset.price, asset.currency)}</p>
+            <p className="text-sm text-muted-foreground">{asset.name} · {fmt(asset.price, asset)}</p>
           </div>
           <button onClick={onClose} aria-label="Cerrar" className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
@@ -82,7 +86,7 @@ export function OrderDialog({ asset, onClose }: { asset: Asset; onClose: () => v
         />
         <div className="mt-3 flex justify-between text-sm">
           <span className="text-muted-foreground">Total estimado</span>
-          <span className="font-mono">{fmt(asset.price * qty, asset.currency)}</span>
+          <span className="font-mono">{fmt(asset.price * qty, asset)}</span>
         </div>
         <button
           type="button"

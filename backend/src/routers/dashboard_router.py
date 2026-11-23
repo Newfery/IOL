@@ -75,6 +75,7 @@ def market_assets(db: Session = Depends(get_db)):
         "cedear": "CEDEAR",
         "bono": "Bono",
         "etf": "ETF",
+        "fci": "FCI",
     }
     return [
         {
@@ -85,6 +86,7 @@ def market_assets(db: Session = Depends(get_db)):
             "change": float(asset.variacion_porcentual),
             "type": type_names.get(asset.tipo, "FCI"),
             "currency": asset.moneda,
+            "quoteDate": asset.fecha_cotizacion.isoformat() if asset.fecha_cotizacion else None,
         }
         for asset in assets
     ]

@@ -36,6 +36,7 @@ export type Asset = {
   change: number;
   type: "Acción" | "CEDEAR" | "Bono" | "ETF" | "FCI";
   currency: Moneda;
+  quoteDate?: string | null;
 };
 export type Holding = { symbol: string; qty: number; avgPrice: number; currency: Moneda };
 export type Favorite = { inversor_id: number; activo_id: number };

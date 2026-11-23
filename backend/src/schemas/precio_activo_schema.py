@@ -4,4 +4,4 @@ from pydantic import BaseModel, Field
 
 
 class UpdatePrecioActivoSchema(BaseModel):
-    precio: Decimal = Field(gt=0, max_digits=15, decimal_places=2)
+    precio: Decimal = Field(gt=0, max_digits=15, decimal_places=6)

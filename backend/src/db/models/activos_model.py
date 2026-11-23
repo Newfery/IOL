@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Numeric, CheckConstraint, text
+from sqlalchemy import Column, Date, Integer, String, Boolean, Numeric, CheckConstraint, text
 from sqlalchemy.orm import relationship
 
 from src.db.connection import Base
@@ -12,7 +12,8 @@ class Activo(Base):
     nombre = Column(String(100), nullable=False)
     tipo = Column(String(10), nullable=False)
     moneda = Column(String(3), nullable=False)
-    precio_actual = Column(Numeric(15, 2), nullable=False)
+    precio_actual = Column(Numeric(15, 6), nullable=False)
+    fecha_cotizacion = Column(Date, nullable=True)
     variacion_porcentual = Column(
         Numeric(8, 4), nullable=False, default=0, server_default=text("0")
     )
@@ -26,7 +27,7 @@ class Activo(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "tipo IN ('accion', 'cedear', 'bono', 'etf')",
+            "tipo IN ('accion', 'cedear', 'bono', 'etf', 'fci')",
             name="chk_activo_tipo",
         ),
         CheckConstraint("moneda IN ('ARS', 'USD')"),

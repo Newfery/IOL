@@ -37,13 +37,14 @@
         nombre VARCHAR(255) NOT NULL,
         tipo VARCHAR(20) NOT NULL,
         moneda VARCHAR(3) NOT NULL,
-        precio_actual DECIMAL(15, 4) NOT NULL,
+        precio_actual DECIMAL(15, 6) NOT NULL,
+        fecha_cotizacion DATE NULL,
         variacion_porcentual DECIMAL(8, 4) NOT NULL DEFAULT 0,
         nivel_riesgo INT NOT NULL,
         activo BOOLEAN DEFAULT TRUE NOT NULL,
         
         -- HU2: Tipos y monedas válidas
-        CONSTRAINT chk_activo_tipo CHECK (tipo IN ('accion', 'cedear', 'bono', 'etf')),
+        CONSTRAINT chk_activo_tipo CHECK (tipo IN ('accion', 'cedear', 'bono', 'etf', 'fci')),
         CONSTRAINT chk_activo_moneda CHECK (moneda IN ('ARS', 'USD')),
         -- HU2: Precio mayor a 0 y riesgo de 1 a 5
         CONSTRAINT chk_precio_actual CHECK (precio_actual > 0),
