@@ -232,10 +232,19 @@ function Grupos() {
 
           {group && (
             <div className="space-y-6 lg:col-span-3">
-              <div className="grid gap-4 md:grid-cols-2">
-                <Stat label="Pozo disponible" value={fmt(group.cash)} />
-                <Stat label="Total aportado" value={fmt(totalPool)} />
+              <div className="grid gap-4 md:grid-cols-3">
+                <Stat label="Pozo disponible (ARS)" value={fmt(group.cash)} />
+                <Stat
+                  label="Pozo disponible (USD)"
+                  value={exchangeRate === null ? "No disponible" : fmtUsd(group.cash / exchangeRate)}
+                />
+                <Stat label="Total aportado (ARS)" value={fmt(totalPool)} />
               </div>
+              {exchangeRate === null && group.cash > 0 && (
+                <p role="status" className="text-xs text-muted-foreground">
+                  {quoteError || "No hay una cotización MEP disponible para mostrar el pozo en USD."}
+                </p>
+              )}
 
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="rounded-xl border border-border bg-card p-5">
@@ -290,7 +299,11 @@ function Grupos() {
                   {assetsError && <p role="alert" className="mt-2 text-sm text-loss">{assetsError}</p>}
                   <select value={symbol} onChange={(e) => setSymbol(e.target.value)}
                     className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    {assets.map((a) => <option key={a.symbol} value={a.symbol}>{a.symbol} — {a.name} ({a.currency})</option>)}
+                    {assets.map((a) => (
+                      <option key={a.symbol} value={a.symbol}>
+                        {a.symbol} — {a.name} ({a.symbol.endsWith(".US") ? "EE. UU. · USD" : a.currency})
+                      </option>
+                    ))}
                   </select>
                   <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
                     className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />

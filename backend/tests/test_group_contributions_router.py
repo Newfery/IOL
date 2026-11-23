@@ -73,11 +73,11 @@ class GroupContributionRouteTests(unittest.TestCase):
         self.assertEqual(groups[0]["id"], str(self.group_id))
         self.assertEqual(groups[0]["members"][0]["contributedUsd"], 0)
 
-    def test_group_buys_usd_asset_using_mep_and_returns_holding_currency(self):
+    def test_group_buys_us_stock_using_mep_and_returns_holding_currency(self):
         asset = Activo(
-            ticker="ETF.US",
-            nombre="ETF en dólares",
-            tipo="etf",
+            ticker="AAPL.US",
+            nombre="Apple",
+            tipo="accion",
             moneda="USD",
             precio_actual=Decimal("10.00"),
             variacion_porcentual=Decimal("0"),
@@ -94,7 +94,7 @@ class GroupContributionRouteTests(unittest.TestCase):
         ) as quote_mock:
             response = group_operation(
                 self.group_id,
-                GroupOperationRequest(ticker="ETF.US", cantidad=Decimal("2")),
+                GroupOperationRequest(ticker="AAPL.US", cantidad=Decimal("2")),
                 self.db,
                 self.investor,
             )
@@ -102,7 +102,7 @@ class GroupContributionRouteTests(unittest.TestCase):
         self.assertEqual(response["cash"], 19850)
         self.assertEqual(
             response["holdings"],
-            [{"symbol": "ETF.US", "qty": 2, "avgPrice": 10, "currency": "USD"}],
+            [{"symbol": "AAPL.US", "qty": 2, "avgPrice": 10, "currency": "USD"}],
         )
         quote_mock.assert_called_once_with(self.db, None, "AL30", "AL30D", "mep")
 
