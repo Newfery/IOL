@@ -51,6 +51,15 @@
         CONSTRAINT chk_nivel_riesgo CHECK (nivel_riesgo BETWEEN 1 AND 5)
     );
 
+    CREATE TABLE activo_cotizacion_historica (
+        id SERIAL PRIMARY KEY,
+        activo_id INT NOT NULL REFERENCES activo(id) ON DELETE CASCADE,
+        fecha DATE NOT NULL,
+        precio DECIMAL(15, 6) NOT NULL,
+        CONSTRAINT uq_activo_cotizacion_historica_activo_fecha UNIQUE (activo_id, fecha),
+        CONSTRAINT chk_activo_cotizacion_historica_precio CHECK (precio > 0)
+    );
+
     -- 4. Tabla Operacion
     CREATE TABLE operacion (
         id SERIAL PRIMARY KEY,

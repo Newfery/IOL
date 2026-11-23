@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+from collections import defaultdict
 from io import BytesIO
 import logging
 from urllib.error import URLError
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from src.db.connection import SessionLocal
 from src.db.models.activos_model import Activo
+from src.db.models.activo_cotizacion_historica_model import ActivoCotizacionHistorica
 # Register the target of Activo.inversores_favoritos for SQLAlchemy.
 from src.db.models.inversor_model import Inversor
 
@@ -35,6 +37,8 @@ class FciQuote:
     price: Decimal
     change: Decimal
     quote_date: date
+    previous_price: Decimal | None = None
+    previous_quote_date: date | None = None
 
 
 def _parse_date(value: object) -> date:
@@ -67,10 +71,16 @@ def parse_cafci_workbook(content: bytes) -> list[FciQuote]:
     quotes: dict[str, FciQuote] = {}
     skipped_identity = 0
     skipped_quote = 0
+    skipped_previous_quote = 0
     try:
         worksheet = workbook.active
         if worksheet is None:
             raise CafciProviderError("La planilla CAFCI no contiene una hoja activa")
+        try:
+            previous_quote_date = _parse_date(worksheet.cell(row=9, column=7).value)
+        except (ValueError, TypeError):
+            previous_quote_date = None
+
         for row in worksheet.iter_rows(min_row=10, values_only=True):
             if len(row) <= 20 or row[20] is None:
                 continue
@@ -98,6 +108,14 @@ def parse_cafci_workbook(content: bytes) -> list[FciQuote]:
             if price <= 0:
                 skipped_quote += 1
                 continue
+            previous_price = None
+            if previous_quote_date is not None and previous_quote_date < quote_date and row[6] is not None:
+                try:
+                    candidate_previous_price = _parse_number(row[6])
+                    if candidate_previous_price > 0:
+                        previous_price = candidate_previous_price.quantize(Decimal("0.000001"))
+                except (InvalidOperation, ValueError, TypeError):
+                    skipped_previous_quote += 1
             ticker = f"FCI-{code}"
             if ticker in quotes:
                 raise CafciProviderError(f"El código CAFCI {code} está duplicado")
@@ -108,17 +126,20 @@ def parse_cafci_workbook(content: bytes) -> list[FciQuote]:
                 price=price.quantize(Decimal("0.000001")),
                 change=change.quantize(Decimal("0.0001")),
                 quote_date=quote_date,
+                previous_price=previous_price,
+                previous_quote_date=previous_quote_date if previous_price is not None else None,
             )
     finally:
         workbook.close()
 
     if not quotes:
         raise CafciProviderError("La planilla CAFCI no contiene cuotapartes válidas")
-    if skipped_identity or skipped_quote:
+    if skipped_identity or skipped_quote or skipped_previous_quote:
         logger.warning(
-            "CAFCI: se omitieron %s filas por datos de identificación y %s por cotizaciones inválidas",
+            "CAFCI: se omitieron %s filas por identificación, %s por cotización actual y %s por cotización previa",
             skipped_identity,
             skipped_quote,
+            skipped_previous_quote,
         )
     return list(quotes.values())
 
@@ -137,11 +158,18 @@ def fetch_cafci_quotes() -> list[FciQuote]:
 
 
 def sync_cafci_quotes(db: Session, quotes: list[FciQuote]) -> tuple[int, int]:
+    if len({quote.ticker for quote in quotes}) != len(quotes):
+        raise CafciProviderError("La lista CAFCI contiene tickers duplicados")
+
     inserted = 0
     updated = 0
     try:
+        assets_by_ticker = {
+            asset.ticker: asset
+            for asset in db.query(Activo).all()
+        }
         for quote in quotes:
-            asset = db.query(Activo).filter(Activo.ticker == quote.ticker).one_or_none()
+            asset = assets_by_ticker.get(quote.ticker)
             if asset is None:
                 asset = Activo(
                     ticker=quote.ticker,
@@ -155,8 +183,9 @@ def sync_cafci_quotes(db: Session, quotes: list[FciQuote]) -> tuple[int, int]:
                     activo=True,
                 )
                 db.add(asset)
+                assets_by_ticker[quote.ticker] = asset
                 inserted += 1
-            else:
+            elif asset.fecha_cotizacion is None or quote.quote_date >= asset.fecha_cotizacion:
                 asset.nombre = quote.name
                 asset.tipo = "fci"
                 asset.moneda = quote.currency
@@ -165,6 +194,39 @@ def sync_cafci_quotes(db: Session, quotes: list[FciQuote]) -> tuple[int, int]:
                 asset.variacion_porcentual = quote.change
                 asset.activo = True
                 updated += 1
+
+        db.flush()
+        quotes_by_date: dict[date, list[tuple[Activo, Decimal]]] = defaultdict(list)
+        for quote in quotes:
+            asset = assets_by_ticker[quote.ticker]
+            if quote.previous_price is not None and quote.previous_quote_date is not None:
+                quotes_by_date[quote.previous_quote_date].append((asset, quote.previous_price))
+            quotes_by_date[quote.quote_date].append((asset, quote.price))
+
+        for quote_date, daily_quotes in quotes_by_date.items():
+            assets_for_date = [asset for asset, _ in daily_quotes]
+            history_by_key: dict[tuple[int, date], ActivoCotizacionHistorica] = {}
+            for offset in range(0, len(assets_for_date), 500):
+                asset_ids = [asset.id for asset in assets_for_date[offset:offset + 500]]
+                records = db.query(ActivoCotizacionHistorica).filter(
+                    ActivoCotizacionHistorica.activo_id.in_(asset_ids),
+                    ActivoCotizacionHistorica.fecha == quote_date,
+                ).all()
+                history_by_key.update(
+                    {(record.activo_id, record.fecha): record for record in records}
+                )
+
+            for asset, price in daily_quotes:
+                history_key = (asset.id, quote_date)
+                record = history_by_key.get(history_key)
+                if record is None:
+                    db.add(ActivoCotizacionHistorica(
+                        activo_id=asset.id,
+                        fecha=quote_date,
+                        precio=price,
+                    ))
+                else:
+                    record.precio = price
         db.commit()
     except SQLAlchemyError:
         db.rollback()

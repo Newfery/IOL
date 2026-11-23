@@ -85,9 +85,13 @@ en el catálogo. También se puede ejecutar manualmente desde `backend/`:
 ```
 
 Los FCI se guardan con ticker `FCI-<código CAFCI>` y precisión de seis decimales
-para conservar el valor de cuotaparte. La migración
+para conservar el valor de cuotaparte. Cada cotización se guarda en el
+historial por fecha; si la misma fecha se sincroniza otra vez, se actualiza ese
+punto en lugar de duplicarlo. La migración
 [`008_cafci_fci.sql`](src/db/migrations/008_cafci_fci.sql) habilita el tipo FCI,
-amplía la precisión del precio y agrega la fecha de cotización.
+amplía la precisión del precio y agrega la fecha de cotización. La migración
+[`009_fci_price_history.sql`](src/db/migrations/009_fci_price_history.sql)
+crea el historial e inicializa un punto con la última cotización disponible.
 
 La integración de bonos requiere acceso autorizado a la API de renta fija de
 BYMA y su documentación técnica. No se usa un proveedor no oficial ni se
@@ -129,7 +133,8 @@ Para instalaciones existentes, aplicar en orden las migraciones
 [`005_us_assets_catalog.sql`](src/db/migrations/005_us_assets_catalog.sql),
 [`006_aporte_grupo_moneda.sql`](src/db/migrations/006_aporte_grupo_moneda.sql) y
 [`007_favoritos.sql`](src/db/migrations/007_favoritos.sql) y
-[`008_cafci_fci.sql`](src/db/migrations/008_cafci_fci.sql).
+[`008_cafci_fci.sql`](src/db/migrations/008_cafci_fci.sql) y
+[`009_fci_price_history.sql`](src/db/migrations/009_fci_price_history.sql).
 La migración conserva los inversores actuales sin asignarles contraseñas.
 Configurar `PASSWORD_FINGERPRINT_SECRET` con un secreto estable y distinto de
 `JWT_SECRET`; si se omite, se deriva del `JWT_SECRET` configurado.

@@ -74,8 +74,6 @@ function AssetDetail() {
         }
         setAsset(matched);
 
-        if (matched.type === "FCI") return;
-
         try {
           const points = await getHistory(matched.symbol);
           if (active) {
@@ -256,6 +254,17 @@ function AssetDetail() {
                             isAnimationActive={false}
                           />
                         ))}
+                        {points.length === 1 && (
+                          <Line
+                            type="linear"
+                            dataKey="price"
+                            stroke="var(--primary)"
+                            strokeWidth={2}
+                            dot={{ r: 4, fill: "var(--primary)" }}
+                            activeDot={{ r: 5 }}
+                            isAnimationActive={false}
+                          />
+                        )}
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -266,7 +275,7 @@ function AssetDetail() {
               ) : (
                 <p className="py-12 text-muted-foreground">
                   {asset.type === "FCI"
-                    ? "CAFCI publica el valor de cuotaparte diariamente; el historial no está disponible en esta integración."
+                    ? "El historial de CAFCI se acumula diariamente; todavía no hay cotizaciones suficientes para graficar."
                     : "No hay cotizaciones históricas disponibles para este período."}
                 </p>
               )}

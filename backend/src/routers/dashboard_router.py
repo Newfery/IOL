@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from src.db.connection import get_db
 from src.db.models.aporte_grupo_model import AporteGrupo
 from src.db.models.activos_model import Activo
+from src.db.models.activo_cotizacion_historica_model import ActivoCotizacionHistorica
 from src.db.models.cuenta_model import Cuenta
 from src.db.models.grupo_de_inversion_model import GrupoDeInversion
 from src.db.models.grupo_inversor_model import GrupoInversor
@@ -93,8 +94,19 @@ def market_assets(db: Session = Depends(get_db)):
 
 
 @router.get("/market/assets/{symbol}/history")
-def market_asset_history(symbol: str):
+def market_asset_history(symbol: str, db: Session = Depends(get_db)):
     ticker = symbol.strip().upper()
+    asset = db.query(Activo).filter(Activo.ticker == ticker).one_or_none()
+    if asset is not None and asset.tipo == "fci":
+        history = db.query(ActivoCotizacionHistorica).filter(
+            ActivoCotizacionHistorica.activo_id == asset.id
+        ).order_by(ActivoCotizacionHistorica.fecha.desc()).limit(366).all()
+        history.reverse()
+        return [
+            {"date": quote.fecha.isoformat(), "price": float(quote.precio)}
+            for quote in history
+        ]
+
     if ticker.endswith(".US"):
         market_symbol = ticker[:-3]
     else:
