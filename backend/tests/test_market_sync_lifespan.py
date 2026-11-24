@@ -6,8 +6,11 @@ from src import app as app_module
 
 
 class MarketSyncLifespanTests(unittest.IsolatedAsyncioTestCase):
-    async def test_lifespan_runs_yahoo_sync_once_on_startup(self):
+    async def test_lifespan_runs_yahoo_then_data912_sync_on_startup(self):
+        calls = []
+
         async def run_sync(function):
+            calls.append(function)
             if function is app_module.sync_yfinance_assets:
                 return 0, 0, [], 500
             return 0, 0
@@ -18,11 +21,26 @@ class MarketSyncLifespanTests(unittest.IsolatedAsyncioTestCase):
             side_effect=run_sync,
         ) as to_thread:
             async with app_module.lifespan(app_module.app):
-                await asyncio.sleep(0.01)
+                for _ in range(10):
+                    if app_module.sync_data912_assets in calls:
+                        break
+                    await asyncio.sleep(0.01)
 
-        self.assertEqual(
-            to_thread.await_args_list.count(call(app_module.sync_yfinance_assets)),
-            1,
+        sync_calls = [
+            function
+            for function in calls
+            if function in (
+                app_module.sync_yfinance_assets,
+                app_module.sync_data912_assets,
+            )
+        ]
+        self.assertEqual(sync_calls, [
+            app_module.sync_yfinance_assets,
+            app_module.sync_data912_assets,
+        ])
+        self.assertLess(
+            to_thread.await_args_list.index(call(app_module.sync_yfinance_assets)),
+            to_thread.await_args_list.index(call(app_module.sync_data912_assets)),
         )
 
 

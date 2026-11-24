@@ -26,10 +26,12 @@ from src.routers import (
 )
 from src.db.seeders.yfinance_assets import sync_assets as sync_yfinance_assets
 from src.services.cafci_service import CafciProviderError, sync_cafci_assets
+from src.services.data912_service import Data912ProviderError, sync_data912_assets
 from src.utils.errors import AppError
 
 logger = logging.getLogger(__name__)
 CAFCI_REFRESH_SECONDS = 6 * 60 * 60
+DATA912_REFRESH_SECONDS = 2 * 60 * 60
 
 
 async def _refresh_cafci_periodically() -> None:
@@ -40,6 +42,22 @@ async def _refresh_cafci_periodically() -> None:
         except (CafciProviderError, SQLAlchemyError):
             logger.exception("Falló la actualización de cuotapartes CAFCI")
         await asyncio.sleep(CAFCI_REFRESH_SECONDS)
+
+
+async def _refresh_data912_periodically(startup_task: asyncio.Task[None]) -> None:
+    await asyncio.wait((startup_task,))
+
+    while True:
+        try:
+            updated, missing = await asyncio.to_thread(sync_data912_assets)
+            logger.info(
+                "Sincronización Data912: %s activos actualizados, %s tickers no registrados",
+                updated,
+                missing,
+            )
+        except (Data912ProviderError, SQLAlchemyError):
+            logger.exception("Falló la actualización de precios desde Data912")
+        await asyncio.sleep(DATA912_REFRESH_SECONDS)
 
 
 async def _sync_yahoo_assets_on_startup() -> None:
@@ -62,7 +80,8 @@ def _log_yahoo_sync_failure(task: asyncio.Task[None]) -> None:
     error = task.exception()
     if error is not None:
         logger.error(
-            "Falló la sincronización inicial de Yahoo Finance",
+            "Falló la sincronización inicial de Yahoo Finance; "
+            "continúa la actualización de precios de Data912",
             exc_info=(type(error), error, error.__traceback__),
         )
 
@@ -72,18 +91,17 @@ async def lifespan(_: FastAPI):
     cafci_task = asyncio.create_task(_refresh_cafci_periodically())
     yahoo_task = asyncio.create_task(_sync_yahoo_assets_on_startup())
     yahoo_task.add_done_callback(_log_yahoo_sync_failure)
+    data912_task = asyncio.create_task(_refresh_data912_periodically(yahoo_task))
     try:
         yield
     finally:
-        cafci_task.cancel()
-        try:
-            await cafci_task
-        except asyncio.CancelledError:
-            pass
-        if not yahoo_task.done():
-            yahoo_task.cancel()
+        tasks = (cafci_task, yahoo_task, data912_task)
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        for task in tasks:
             try:
-                await yahoo_task
+                await task
             except asyncio.CancelledError:
                 pass
 
