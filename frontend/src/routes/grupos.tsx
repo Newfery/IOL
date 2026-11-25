@@ -1,7 +1,7 @@
 import { RequireAuth } from "@/components/RequireAuth";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeftRight } from "lucide-react";
+import { ArrowLeftRight, Plus, UserPlus } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import {
   contributeToGroup,
@@ -47,6 +47,7 @@ function Grupos() {
   const [newPass, setNewPass] = useState("");
   const [code, setCode] = useState("");
   const [joinPass, setJoinPass] = useState("");
+  const [groupAction, setGroupAction] = useState<"create" | "join" | null>(null);
   const [amount, setAmount] = useState(10000);
   const [currency, setCurrency] = useState<Moneda>("ARS");
   const [summaryCurrency, setSummaryCurrency] = useState<Moneda>("ARS");
@@ -117,6 +118,7 @@ function Grupos() {
     setNewName("");
     setNewPass("");
     setMsg(`Grupo creado. Compartí el nombre "${g.name}" y la contraseña con tus amigos.`);
+    setGroupAction(null);
     refresh(g.id);
   }
   async function onJoin() {
@@ -129,6 +131,7 @@ function Grupos() {
     setCode("");
     setJoinPass("");
     setMsg(`Te uniste a "${g.name}".`);
+    setGroupAction(null);
     refresh(g.id);
   }
   async function onContribute() {
@@ -160,39 +163,68 @@ function Grupos() {
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader />
       <main className="mx-auto max-w-7xl space-y-8 px-6 py-8">
-        <div>
-          <h1 className="font-display text-3xl font-bold">Grupos de inversión</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Juntá plata con amigos o conocidos y compren activos entre todos.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="font-display text-3xl font-bold">Grupos de inversión</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Juntá plata con amigos o conocidos y compren activos entre todos.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setGroupAction("create")}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              <Plus className="size-4" />
+              Crear
+            </button>
+            <button
+              type="button"
+              onClick={() => setGroupAction("join")}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold"
+            >
+              <UserPlus className="size-4" />
+              Unirse
+            </button>
+          </div>
         </div>
 
-        <section className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-xl border border-border bg-card p-5">
-            <h2 className="font-display text-lg font-semibold">Crear un grupo</h2>
-            <div className="mt-3 flex gap-2">
-              <div className="flex flex-1 flex-col gap-2">
-                <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre del grupo"
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm" />
-                <input type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Contraseña para unirse"
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm" />
-              </div>
-              <button onClick={onCreate} className="rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground">Crear</button>
+        {groupAction === "create" && (
+          <section className="ml-auto max-w-xl rounded-xl border border-border bg-card p-5">
+            <div className="flex items-start justify-between gap-4">
+              <h2 className="font-display text-lg font-semibold">Crear un grupo</h2>
+              <button type="button" onClick={() => setGroupAction(null)} className="text-sm text-muted-foreground hover:text-foreground">
+                Cerrar
+              </button>
             </div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-5">
-            <h2 className="font-display text-lg font-semibold">Unirme a un grupo</h2>
-            <div className="mt-3 flex gap-2">
-              <div className="flex flex-1 flex-col gap-2">
-                <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Nombre del grupo"
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm" />
-                <input type="password" value={joinPass} onChange={(e) => setJoinPass(e.target.value)} placeholder="Contraseña"
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm" />
-              </div>
-              <button onClick={onJoin} className="rounded-md bg-secondary px-4 text-sm font-semibold">Unirme</button>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre del grupo"
+                className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <input type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Contraseña para unirse"
+                className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <button type="button" onClick={onCreate} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Crear</button>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
+
+        {groupAction === "join" && (
+          <section className="ml-auto max-w-xl rounded-xl border border-border bg-card p-5">
+            <div className="flex items-start justify-between gap-4">
+              <h2 className="font-display text-lg font-semibold">Unirme a un grupo</h2>
+              <button type="button" onClick={() => setGroupAction(null)} className="text-sm text-muted-foreground hover:text-foreground">
+                Cerrar
+              </button>
+            </div>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Nombre del grupo"
+                className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <input type="password" value={joinPass} onChange={(e) => setJoinPass(e.target.value)} placeholder="Contraseña"
+                className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <button type="button" onClick={onJoin} className="rounded-md bg-secondary px-4 py-2 text-sm font-semibold">Unirse</button>
+            </div>
+          </section>
+        )}
 
         {msg && <p className="text-sm text-primary">{msg}</p>}
         {groupsError && (
