@@ -100,6 +100,7 @@ function AssetDetail() {
           return;
         }
         setAsset(matched);
+        setDays(matched.type === "Bono" ? 365 : 30);
 
         try {
           const points = await getHistory(matched.symbol);

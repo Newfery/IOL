@@ -37,6 +37,7 @@ from src.utils.hash import hash_password, verify_password
 
 router = APIRouter(tags=["frontend"])
 logger = logging.getLogger(__name__)
+MIN_BOND_HISTORY_POINTS = 3
 
 
 def _group_payload(db: Session, group: GrupoDeInversion) -> dict:
@@ -118,17 +119,17 @@ def market_asset_history(symbol: str, db: Session = Depends(get_db)):
             try:
                 data912_history = fetch_data912_bond_history(ticker)
             except Data912HistoryNotFoundError as exc:
-                if stored_history:
+                if len(stored_history) >= MIN_BOND_HISTORY_POINTS:
                     logger.warning(
                         "Data912 no tiene historial para el bono %s; usando cotizaciones locales",
                         ticker,
                     )
                     return stored_history
                 raise NotFoundError(
-                    f"Data912 no tiene historial disponible para el bono {ticker}"
+                    f"No hay suficientes datos históricos de Data912 para el bono {ticker}"
                 ) from exc
             except Data912ProviderError as exc:
-                if stored_history:
+                if len(stored_history) >= MIN_BOND_HISTORY_POINTS:
                     logger.warning(
                         "No se pudo consultar Data912 para el bono %s; usando cotizaciones locales: %s",
                         ticker,
@@ -158,6 +159,10 @@ def market_asset_history(symbol: str, db: Session = Depends(get_db)):
             }
             for point in stored_history:
                 points_by_date.setdefault(point["date"], point)
+            if len(points_by_date) < MIN_BOND_HISTORY_POINTS:
+                raise NotFoundError(
+                    f"No hay suficientes datos históricos de Data912 para el bono {ticker}"
+                )
             return [points_by_date[day] for day in sorted(points_by_date)]
 
     if ticker.endswith(".US"):

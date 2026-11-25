@@ -76,6 +76,13 @@ class Data912ServiceTests(unittest.TestCase):
             db.commit()
             history = [
                 Data912HistoricalQuote(
+                    date(2026, 11, 22),
+                    Decimal("101"),
+                    Decimal("100"),
+                    Decimal("102"),
+                    Decimal("99"),
+                ),
+                Data912HistoricalQuote(
                     date(2026, 11, 23),
                     Decimal("102"),
                     Decimal("100"),
@@ -101,6 +108,13 @@ class Data912ServiceTests(unittest.TestCase):
             yahoo_ticker.assert_not_called()
             self.assertEqual(quotes, [
                 {
+                    "date": "2026-11-22",
+                    "price": 101.0,
+                    "open": 100.0,
+                    "high": 102.0,
+                    "low": 99.0,
+                },
+                {
                     "date": "2026-11-23",
                     "price": 102.0,
                     "open": 100.0,
@@ -116,14 +130,28 @@ class Data912ServiceTests(unittest.TestCase):
                 },
             ])
 
+            asset = db.query(Activo).filter(Activo.ticker == "AL30").one()
+            db.add_all([
+                ActivoCotizacionHistorica(
+                    activo_id=asset.id,
+                    fecha=date(2026, 11, 23),
+                    precio=Decimal("102"),
+                ),
+                ActivoCotizacionHistorica(
+                    activo_id=asset.id,
+                    fecha=date(2026, 11, 24),
+                    precio=Decimal("103.25"),
+                ),
+            ])
+            db.commit()
             with (
                 patch(
                     "src.routers.dashboard_router.fetch_data912_bond_history",
-                    side_effect=Data912HistoryNotFoundError("unsupported"),
+                    side_effect=Data912HistoryNotFoundError("Data912 no tiene historial"),
                 ),
                 patch("src.routers.dashboard_router.yf.Ticker") as yahoo_ticker,
             ):
-                with self.assertRaises(NotFoundError):
+                with self.assertRaisesRegex(NotFoundError, "No hay suficientes datos históricos"):
                     market_asset_history("AL30", db)
             yahoo_ticker.assert_not_called()
         finally:
