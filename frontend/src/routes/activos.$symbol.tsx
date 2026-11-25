@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { ArrowDownRight, ArrowLeft, ArrowUpRight } from "lucide-react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AppHeader } from "@/components/AppHeader";
 import { OrderDialog } from "@/components/OrderDialog";
 import { RequireAuth } from "@/components/RequireAuth";
@@ -45,6 +45,31 @@ const dateLabel = (value: string) =>
     timeZone: "UTC",
   });
 
+type Candle = { open: number; high: number; low: number; price: number };
+
+function CandleShape(props: unknown) {
+  const { x, y, width, height, payload } = props as {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    payload: { candle: Candle | null };
+  };
+  const candle = payload.candle;
+  if (!candle) return <g />;
+  const { open, high, low, price } = candle;
+  const color = price >= open ? "var(--gain)" : "var(--loss)";
+  const middle = x + width / 2;
+  const priceY = (value: number) => high === low ? y : y + ((high - value) / (high - low)) * height;
+  const top = Math.min(priceY(open), priceY(price));
+  return (
+    <g>
+      <line x1={middle} x2={middle} y1={y} y2={y + height} stroke={color} />
+      <rect x={x} y={top} width={width} height={Math.max(1, Math.abs(priceY(open) - priceY(price)))} fill={color} />
+    </g>
+  );
+}
+
 function AssetDetail() {
   const { symbol } = Route.useParams();
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -54,6 +79,8 @@ function AssetDetail() {
   const [historyError, setHistoryError] = useState("");
   const [days, setDays] = useState<number>(30);
   const [orderOpen, setOrderOpen] = useState(false);
+  const [chartType, setChartType] = useState<"line" | "candles">("line");
+  const gradientId = useId();
 
   useEffect(() => {
     let active = true;
@@ -107,35 +134,21 @@ function AssetDetail() {
   const change = first && last && first.price !== 0 ? (last.price / first.price - 1) * 100 : 0;
   const category = asset ? categoryForAsset(asset) : null;
   const prices = points.map((point) => point.price);
-  const chartData: Array<{ date: string; price: number; [key: string]: string | number | null }> =
-    points.map((point) => ({ ...point }));
-  const chartSegments: Array<{ dataKey: string; color: string }> = [];
-  let segmentStart = 0;
-  while (segmentStart < points.length - 1) {
-    const direction = Math.sign(points[segmentStart + 1].price - points[segmentStart].price);
-    let segmentEnd = segmentStart + 1;
-    while (
-      segmentEnd < points.length - 1 &&
-      Math.sign(points[segmentEnd + 1].price - points[segmentEnd].price) === direction
-    ) {
-      segmentEnd += 1;
-    }
-
-    const dataKey = `trend-${chartSegments.length}`;
-    for (let index = segmentStart; index <= segmentEnd; index += 1) {
-      chartData[index][dataKey] = points[index].price;
-    }
-    chartSegments.push({
-      dataKey,
-      color:
-        direction > 0
-          ? "var(--gain)"
-          : direction < 0
-            ? "var(--loss)"
-            : "#fff",
-    });
-    segmentStart = segmentEnd;
-  }
+  const minimum = Math.min(...prices);
+  const maximum = Math.max(...prices);
+  const baseline = first?.price ?? 0;
+  // A linear price axis maps the starting price to this position within the path.
+  const colorBoundary = maximum !== minimum ? (maximum - baseline) / (maximum - minimum) : 0;
+  const lineColor = minimum === maximum ? "var(--primary)"
+    : baseline === minimum ? "var(--gain)"
+    : baseline === maximum ? "var(--loss)"
+    : `url(#${gradientId})`;
+  const chartData = points.map(({ date, price, open, high, low }) => {
+    const candle = open != null && high != null && low != null ? { open, high, low, price } : null;
+    return { date, price, candle, candleRange: candle ? [candle.low, candle.high] : null };
+  });
+  const hasCandles = chartData.some((point) => point.candle !== null);
+  const showCandles = chartType === "candles" && hasCandles;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -190,21 +203,44 @@ function AssetDetail() {
                       : `${change >= 0 ? "+" : ""}${change.toFixed(2)}% en el período`}
                   </p>
                 </div>
-                {asset.type !== "FCI" && (
-                  <div className="flex flex-wrap gap-1" role="group" aria-label="Rango de tiempo">
-                    {HISTORY_RANGES.map((range) => (
+                <div className="flex flex-wrap gap-2">
+                  {points.length > 0 && (
+                    <div className="flex gap-1" role="group" aria-label="Tipo de gráfico">
                       <Button
-                        key={range.days}
                         size="sm"
-                        variant={days === range.days ? "default" : "ghost"}
-                        aria-pressed={days === range.days}
-                        onClick={() => setDays(range.days)}
+                        variant={showCandles ? "ghost" : "default"}
+                        aria-pressed={!showCandles}
+                        onClick={() => setChartType("line")}
                       >
-                        {range.label}
+                        Línea
                       </Button>
-                    ))}
-                  </div>
-                )}
+                      <Button
+                        size="sm"
+                        variant={showCandles ? "default" : "ghost"}
+                        aria-pressed={showCandles}
+                        disabled={!hasCandles}
+                        onClick={() => setChartType("candles")}
+                      >
+                        Velas
+                      </Button>
+                    </div>
+                  )}
+                  {asset.type !== "FCI" && (
+                    <div className="flex flex-wrap gap-1" role="group" aria-label="Rango de tiempo">
+                      {HISTORY_RANGES.map((range) => (
+                        <Button
+                          key={range.days}
+                          size="sm"
+                          variant={days === range.days ? "default" : "ghost"}
+                          aria-pressed={days === range.days}
+                          onClick={() => setDays(range.days)}
+                        >
+                          {range.label}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               {historyError ? (
                 <p role="alert" className="text-sm text-loss">{historyError}</p>
@@ -212,7 +248,13 @@ function AssetDetail() {
                 <>
                   <div className="h-80 w-full sm:h-96">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartData} margin={{ top: 12, right: 12, bottom: 8, left: 0 }}>
+                      <ComposedChart data={chartData} margin={{ top: 12, right: 12, bottom: 8, left: 0 }}>
+                        <defs>
+                          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset={colorBoundary} stopColor="var(--gain)" />
+                            <stop offset={colorBoundary} stopColor="var(--loss)" />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid stroke="var(--border)" vertical={false} strokeDasharray="3 3" />
                         <XAxis
                           dataKey="date"
@@ -233,7 +275,20 @@ function AssetDetail() {
                           axisLine={false}
                         />
                         <Tooltip
-                          formatter={(value: number) => fmt(value, asset)}
+                          formatter={(_value, _name, item): [ReactNode, string] => {
+                            const { price, candle } = item.payload as (typeof chartData)[number];
+                            if (!showCandles || !candle) return [fmt(price, asset), ""];
+                            return [
+                              <span key="ohlc" className="grid gap-1">
+                                <span>Apertura {fmt(candle.open, asset)}</span>
+                                <span>Máximo {fmt(candle.high, asset)}</span>
+                                <span>Mínimo {fmt(candle.low, asset)}</span>
+                                <span>Cierre {fmt(price, asset)}</span>
+                              </span>,
+                              "",
+                            ];
+                          }}
+                          separator=""
                           labelFormatter={(label) => dateLabel(String(label))}
                           contentStyle={{
                             background: "var(--card)",
@@ -242,30 +297,26 @@ function AssetDetail() {
                             color: "var(--foreground)",
                           }}
                         />
-                        {chartSegments.map(({ dataKey, color }) => (
-                          <Line
-                            key={dataKey}
-                            type="linear"
-                            dataKey={dataKey}
-                            stroke={color}
-                            strokeWidth={2}
-                            dot={false}
-                            activeDot={{ r: 4 }}
-                            isAnimationActive={false}
-                          />
-                        ))}
-                        {points.length === 1 && (
+                        {showCandles ? (
+                          <Bar dataKey="candleRange" maxBarSize={12} shape={CandleShape} isAnimationActive={false} />
+                        ) : (
                           <Line
                             type="linear"
                             dataKey="price"
-                            stroke="var(--primary)"
+                            name=""
+                            stroke={lineColor}
                             strokeWidth={2}
-                            dot={{ r: 4, fill: "var(--primary)" }}
-                            activeDot={{ r: 5 }}
+                            dot={points.length === 1 ? { r: 4 } : false}
+                            activeDot={(props: unknown) => {
+                              const { cx, cy, payload } = props as { cx: number; cy: number; payload: HistoryPoint };
+                              const fill = payload.price === baseline ? "var(--primary)"
+                                : payload.price > baseline ? "var(--gain)" : "var(--loss)";
+                              return <circle cx={cx} cy={cy} r={4} fill={fill} />;
+                            }}
                             isAnimationActive={false}
                           />
                         )}
-                      </LineChart>
+                      </ComposedChart>
                     </ResponsiveContainer>
                   </div>
                   <p className="text-xs text-muted-foreground">

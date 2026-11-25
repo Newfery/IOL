@@ -117,8 +117,14 @@ def market_asset_history(symbol: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=502, detail="No se pudo consultar el historial") from exc
     if history.empty or "Close" not in history:
         raise NotFoundError(f"No se encontraron cotizaciones para {ticker}")
-    return [{"date": date.isoformat(), "price": float(price)}
-            for date, price in history["Close"].dropna().items()]
+    points = []
+    for date, row in history.dropna(subset=["Close"]).iterrows():
+        point = {"date": date.isoformat(), "price": float(row["Close"])}
+        ohlc = row.reindex(["Open", "High", "Low"])
+        if ohlc.notna().all():
+            point.update({key.lower(): float(value) for key, value in ohlc.items()})
+        points.append(point)
+    return points
 
 
 @router.get("/market/dolar")

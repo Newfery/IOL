@@ -41,7 +41,13 @@ export type Asset = {
 export type Holding = { symbol: string; qty: number; avgPrice: number; currency: Moneda };
 export type Favorite = { inversor_id: number; activo_id: number };
 export type Order = { symbol: string; side: "buy" | "sell"; qty: number; price: number };
-export type HistoryPoint = { date: string; price: number };
+export type HistoryPoint = {
+  date: string;
+  price: number;
+  open?: number;
+  high?: number;
+  low?: number;
+};
 export type PerfilRiesgo = "conservador" | "moderado" | "agresivo";
 export type Inversor = { id: number; email: string; nombre: string; cuit: string; perfil_riesgo: PerfilRiesgo; fecha_alta: string };
 export type RegisterInvestorRequest = Pick<Inversor, "email" | "nombre" | "cuit" | "perfil_riesgo"> & {
