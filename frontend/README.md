@@ -32,3 +32,19 @@ on the same network, open `http://<IP-LAN-de-esta-PC>:5173`. If the page cannot
 be reached, allow the frontend's port through Windows Firewall on the private
 network. Do not set `VITE_API_URL` to `127.0.0.1` for this setup: that address
 would refer to the other device itself.
+
+## Install Invertix on your phone
+
+Open the deployed frontend's HTTPS URL on your phone. Configure the deployment
+to forward `/api` to the FastAPI backend, or set `VITE_API_URL` at build time to
+the backend's HTTPS URL and allow the frontend origin in the backend's CORS
+configuration. The plain HTTP LAN URL above is for development.
+
+- **Android (Chrome)** — Open the browser menu, choose **Add to Home screen**
+  or **Install app**, and confirm.
+- **iPhone (Safari)** — Open **Share**, tap **Add to Home Screen**, enable
+  **Open as Web App** if shown, and tap **Add**.
+
+Invertix opens in its own window from the home screen. Login, quotes, and
+orders require a connection. If the app loses connectivity while opening,
+the service worker shows a retry screen after it has activated.
