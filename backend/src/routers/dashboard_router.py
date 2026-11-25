@@ -97,15 +97,18 @@ def market_assets(db: Session = Depends(get_db)):
 def market_asset_history(symbol: str, db: Session = Depends(get_db)):
     ticker = symbol.strip().upper()
     asset = db.query(Activo).filter(Activo.ticker == ticker).one_or_none()
-    if asset is not None and asset.tipo == "fci":
+    if asset is not None:
         history = db.query(ActivoCotizacionHistorica).filter(
             ActivoCotizacionHistorica.activo_id == asset.id
         ).order_by(ActivoCotizacionHistorica.fecha.desc()).limit(366).all()
-        history.reverse()
-        return [
-            {"date": quote.fecha.isoformat(), "price": float(quote.precio)}
-            for quote in history
-        ]
+        if history:
+            history.reverse()
+            return [
+                {"date": quote.fecha.isoformat(), "price": float(quote.precio)}
+                for quote in history
+            ]
+        if asset.tipo == "fci":
+            return []
 
     if ticker.endswith(".US"):
         market_symbol = ticker[:-3]

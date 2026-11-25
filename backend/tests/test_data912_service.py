@@ -1,12 +1,14 @@
 from datetime import date
 from decimal import Decimal
 import unittest
+from unittest.mock import patch
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.db.models.activos_model import Activo
 from src.db.models.activo_cotizacion_historica_model import ActivoCotizacionHistorica
+from src.routers.dashboard_router import market_asset_history
 from src.services.data912_service import (
     DATA912_ENDPOINTS,
     Data912Quote,
@@ -88,6 +90,12 @@ class Data912ServiceTests(unittest.TestCase):
             self.assertEqual(asset.variacion_porcentual, Decimal("4.0000"))
             self.assertEqual(asset.fecha_cotizacion, date(2026, 11, 24))
             self.assertEqual(history.precio, Decimal("13.000000"))
+
+            with patch("src.routers.dashboard_router.yf.Ticker") as yahoo_ticker:
+                quotes = market_asset_history("TEST", db)
+
+            yahoo_ticker.assert_not_called()
+            self.assertEqual(quotes, [{"date": "2026-11-24", "price": 13.0}])
         finally:
             db.close()
             engine.dispose()
