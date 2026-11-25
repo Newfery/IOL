@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { AppHeader } from "@/components/AppHeader";
 import { RequireAuth } from "@/components/RequireAuth";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { getAssets, getPortfolio, type Asset, type Holding } from "@/lib/api";
 import { createAssetColorMap, getAssetColor } from "@/lib/asset-colors";
@@ -28,10 +29,13 @@ export const Route = createFileRoute("/mis-inversiones")({
 const fmt = (n: number, currency: Asset["currency"]) =>
   n.toLocaleString("es-AR", { style: "currency", currency, maximumFractionDigits: 2 });
 
+const PAGE_SIZE = 10;
+
 function MisInversiones() {
   const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (!user) return;
@@ -73,6 +77,10 @@ function MisInversiones() {
   const totalUsdPnl = usdRows.reduce((s, r) => s + r.pnl, 0);
   const arsPieData = arsRows.map((r) => ({ name: r.symbol, value: r.value }));
   const usdPieData = usdRows.map((r) => ({ name: r.symbol, value: r.value }));
+  const pageCount = Math.ceil(rows.length / PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(1, pageCount));
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageRows = rows.slice(pageStart, pageStart + PAGE_SIZE);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -99,55 +107,6 @@ function MisInversiones() {
             )}
           </div>
         </div>
-
-        <section className="overflow-hidden rounded-xl border border-border bg-card">
-          {rows.length === 0 ? (
-            <div className="p-10 text-center text-sm text-muted-foreground">
-              Aún no realizaste ninguna inversión.{" "}
-              <Link to="/operar" className="text-primary">Comenzar ahora →</Link>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="px-4 py-3">Activo</th>
-                    <th className="px-4 py-3">Tipo</th>
-                    <th className="px-4 py-3 text-right">Cantidad</th>
-                    <th className="px-4 py-3 text-right">Precio promedio</th>
-                    <th className="px-4 py-3 text-right">Precio actual</th>
-                    <th className="px-4 py-3 text-right">Valor actual</th>
-                    <th className="px-4 py-3 text-right">Rendimiento</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.symbol} className="border-b border-border/50 last:border-0">
-                      <td className="px-4 py-3">
-                        <Link
-                          to="/activos/$symbol"
-                          params={{ symbol: r.symbol }}
-                          className="font-semibold hover:text-primary"
-                        >
-                          {r.symbol}
-                        </Link>
-                        <span className="ml-2 text-muted-foreground">{r.name}</span>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{r.type}</td>
-                      <td className="px-4 py-3 text-right font-mono">{r.qty}</td>
-                      <td className="px-4 py-3 text-right font-mono">{fmt(r.avgPrice, r.currency)}</td>
-                      <td className="px-4 py-3 text-right font-mono">{fmt(r.price, r.currency)}</td>
-                      <td className="px-4 py-3 text-right font-mono">{fmt(r.value, r.currency)}</td>
-                      <td className={`px-4 py-3 text-right font-mono ${r.pnl >= 0 ? "text-gain" : "text-loss"}`}>
-                        {r.pnl >= 0 ? "+" : ""}{r.pnlPct.toFixed(1)}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
 
         {rows.length > 0 && (
           <section className="rounded-xl border border-border bg-card p-6">
@@ -180,7 +139,7 @@ function MisInversiones() {
                   </div>
                 ))}
               </div>
-              <ul className="space-y-3 text-sm md:pt-1">
+              <ul className="max-h-72 space-y-3 overflow-y-auto text-sm md:pt-1">
                 {rows.map((r) => {
                   const currencyTotal = r.currency === "ARS" ? totalArsValue : totalUsdValue;
                   return (
@@ -199,6 +158,76 @@ function MisInversiones() {
             </div>
           </section>
         )}
+
+        <section aria-labelledby="portfolio-assets-heading" className="overflow-hidden rounded-xl border border-border bg-card">
+          <h2 id="portfolio-assets-heading" className="px-4 py-3 font-display text-lg font-semibold">
+            Tus activos
+          </h2>
+          {rows.length === 0 ? (
+            <div className="p-10 text-center text-sm text-muted-foreground">
+              Aún no realizaste ninguna inversión.{" "}
+              <Link to="/operar" className="text-primary">Comenzar ahora →</Link>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="px-4 py-3">Activo</th>
+                    <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3 text-right">Cantidad</th>
+                    <th className="px-4 py-3 text-right">Precio promedio</th>
+                    <th className="px-4 py-3 text-right">Precio actual</th>
+                    <th className="px-4 py-3 text-right">Valor actual</th>
+                    <th className="px-4 py-3 text-right">Rendimiento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map((r) => (
+                    <tr key={r.symbol} className="border-b border-border/50 last:border-0">
+                      <td className="px-4 py-3">
+                        <Link
+                          to="/activos/$symbol"
+                          params={{ symbol: r.symbol }}
+                          className="font-semibold hover:text-primary"
+                        >
+                          {r.symbol}
+                        </Link>
+                        <span className="ml-2 text-muted-foreground">{r.name}</span>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{r.type}</td>
+                      <td className="px-4 py-3 text-right font-mono">{r.qty}</td>
+                      <td className="px-4 py-3 text-right font-mono">{fmt(r.avgPrice, r.currency)}</td>
+                      <td className="px-4 py-3 text-right font-mono">{fmt(r.price, r.currency)}</td>
+                      <td className="px-4 py-3 text-right font-mono">{fmt(r.value, r.currency)}</td>
+                      <td className={`px-4 py-3 text-right font-mono ${r.pnl >= 0 ? "text-gain" : "text-loss"}`}>
+                        {r.pnl >= 0 ? "+" : ""}{r.pnlPct.toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {pageCount > 1 && (
+            <nav aria-label="Paginación de tus activos" className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+              <p aria-live="polite" className="text-sm text-muted-foreground">
+                Mostrando {pageStart + 1}–{pageStart + pageRows.length} de {rows.length} activos
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={currentPage === 1}
+                  onClick={() => setPage(currentPage - 1)}>
+                  Anterior
+                </Button>
+                <span className="text-sm">Página {currentPage} de {pageCount}</span>
+                <Button type="button" variant="outline" size="sm" disabled={currentPage === pageCount}
+                  onClick={() => setPage(currentPage + 1)}>
+                  Siguiente
+                </Button>
+              </div>
+            </nav>
+          )}
+        </section>
       </main>
     </div>
   );
