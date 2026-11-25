@@ -3,6 +3,7 @@ from decimal import Decimal
 import unittest
 from unittest.mock import patch
 
+import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -92,10 +93,26 @@ class Data912ServiceTests(unittest.TestCase):
             self.assertEqual(history.precio, Decimal("13.000000"))
 
             with patch("src.routers.dashboard_router.yf.Ticker") as yahoo_ticker:
+                yahoo_ticker.return_value.history.return_value = pd.DataFrame(
+                    {
+                        "Open": [10.5, 11],
+                        "High": [11, 12],
+                        "Low": [10, 10.5],
+                        "Close": [10.75, 11.5],
+                    },
+                    index=pd.to_datetime(["2026-11-23", "2026-11-24"]),
+                )
                 quotes = market_asset_history("TEST", db)
 
-            yahoo_ticker.assert_not_called()
-            self.assertEqual(quotes, [{"date": "2026-11-24", "price": 13.0}])
+            yahoo_ticker.return_value.history.assert_called_once_with(
+                period="1y",
+                interval="1d",
+                auto_adjust=False,
+            )
+            self.assertEqual(len(quotes), 2)
+            self.assertEqual(quotes[0]["date"][:10], "2026-11-23")
+            self.assertEqual(quotes[0]["price"], 10.75)
+            self.assertEqual(quotes[1], {"date": "2026-11-24", "price": 13.0})
         finally:
             db.close()
             engine.dispose()

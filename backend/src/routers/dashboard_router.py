@@ -97,18 +97,18 @@ def market_assets(db: Session = Depends(get_db)):
 def market_asset_history(symbol: str, db: Session = Depends(get_db)):
     ticker = symbol.strip().upper()
     asset = db.query(Activo).filter(Activo.ticker == ticker).one_or_none()
+    stored_history = []
     if asset is not None:
         history = db.query(ActivoCotizacionHistorica).filter(
             ActivoCotizacionHistorica.activo_id == asset.id
         ).order_by(ActivoCotizacionHistorica.fecha.desc()).limit(366).all()
-        if history:
-            history.reverse()
-            return [
-                {"date": quote.fecha.isoformat(), "price": float(quote.precio)}
-                for quote in history
-            ]
+        history.reverse()
+        stored_history = [
+            {"date": quote.fecha.isoformat(), "price": float(quote.precio)}
+            for quote in history
+        ]
         if asset.tipo == "fci":
-            return []
+            return stored_history
 
     if ticker.endswith(".US"):
         market_symbol = ticker[:-3]
@@ -117,17 +117,23 @@ def market_asset_history(symbol: str, db: Session = Depends(get_db)):
     try:
         history = yf.Ticker(market_symbol).history(period="1y", interval="1d", auto_adjust=False)
     except Exception as exc:
+        if stored_history:
+            return stored_history
         raise HTTPException(status_code=502, detail="No se pudo consultar el historial") from exc
     if history.empty or "Close" not in history:
+        if stored_history:
+            return stored_history
         raise NotFoundError(f"No se encontraron cotizaciones para {ticker}")
-    points = []
+    points_by_date = {}
     for date, row in history.dropna(subset=["Close"]).iterrows():
         point = {"date": date.isoformat(), "price": float(row["Close"])}
         ohlc = row.reindex(["Open", "High", "Low"])
         if ohlc.notna().all():
             point.update({key.lower(): float(value) for key, value in ohlc.items()})
-        points.append(point)
-    return points
+        points_by_date[point["date"][:10]] = point
+    for point in stored_history:
+        points_by_date[point["date"]] = point
+    return [points_by_date[day] for day in sorted(points_by_date)]
 
 
 @router.get("/market/dolar")
