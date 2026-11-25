@@ -19,9 +19,9 @@ import {
 export const Route = createFileRoute("/grupos")({
   head: () => ({
     meta: [
-      { title: "Grupos de inversión — Invertix" },
+      { title: "Invertix — Grupos de inversión" },
       { name: "description", content: "Creá o unite a un grupo con amigos, junten plata y compren activos entre todos." },
-      { property: "og:title", content: "Grupos de inversión — Invertix" },
+      { property: "og:title", content: "Invertix — Grupos de inversión" },
       { property: "og:description", content: "Invertí en equipo: un pozo común para comprar activos con tus amigos." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

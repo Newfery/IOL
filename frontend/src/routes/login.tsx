@@ -6,9 +6,9 @@ import { useAuth } from "@/lib/auth";
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Iniciar sesión — Invertix" },
+      { title: "Invertix — Iniciar sesión" },
       { name: "description", content: "Ingresá a tu cuenta de Invertix para ver tu saldo y tus inversiones." },
-      { property: "og:title", content: "Iniciar sesión — Invertix" },
+      { property: "og:title", content: "Invertix — Iniciar sesión" },
       { property: "og:description", content: "Ingresá a tu cuenta de Invertix." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

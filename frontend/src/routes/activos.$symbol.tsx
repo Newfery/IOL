@@ -12,7 +12,7 @@ import { HISTORY_RANGES, historyForRange } from "@/lib/asset-history";
 
 export const Route = createFileRoute("/activos/$symbol")({
   head: ({ params }) => {
-    const title = `${params.symbol} — Detalle del activo — Invertix`;
+    const title = `Invertix — ${params.symbol} — Detalle del activo`;
     const description = `Cotización e historial de precios de ${params.symbol} en Invertix.`;
     return {
       meta: [

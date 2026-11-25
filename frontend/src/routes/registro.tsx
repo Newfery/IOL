@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 export const Route = createFileRoute("/registro")({
   head: () => ({
     meta: [
-      { title: "Crear cuenta — Invertix" },
+      { title: "Invertix — Crear cuenta" },
       { name: "description", content: "Creá tu cuenta de inversor en Invertix." },
     ],
   }),

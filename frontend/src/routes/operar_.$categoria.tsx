@@ -15,7 +15,7 @@ const PAGE_SIZE = 20;
 export const Route = createFileRoute("/operar_/$categoria")({
   head: ({ params }) => {
     const category = findCategory(params.categoria);
-    const title = category ? `${category.label} — Invertix` : "Categoría no disponible — Invertix";
+    const title = `Invertix — ${category?.label ?? "Categoría no disponible"}`;
     const description = category?.desc ?? "La categoría que buscás no está disponible.";
     return {
       meta: [

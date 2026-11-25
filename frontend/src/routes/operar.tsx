@@ -12,9 +12,9 @@ import { useFavorites } from "@/lib/use-favorites";
 export const Route = createFileRoute("/operar")({
   head: () => ({
     meta: [
-      { title: "Invertir — Invertix" },
+      { title: "Invertix — Invertir" },
       { name: "description", content: "Explorá activos, categorías e inversiones disponibles en Invertix." },
-      { property: "og:title", content: "Invertir — Invertix" },
+      { property: "og:title", content: "Invertix — Invertir" },
       { property: "og:description", content: "Explorá activos, categorías e inversiones disponibles en Invertix." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
