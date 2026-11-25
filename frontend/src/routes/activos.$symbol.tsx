@@ -296,6 +296,8 @@ function AssetDetail() {
                             borderRadius: 8,
                             color: "var(--foreground)",
                           }}
+                          itemStyle={{ color: "var(--foreground)" }}
+                          labelStyle={{ color: "var(--foreground)" }}
                         />
                         {showCandles ? (
                           <Bar dataKey="candleRange" maxBarSize={12} shape={CandleShape} isAnimationActive={false} />
