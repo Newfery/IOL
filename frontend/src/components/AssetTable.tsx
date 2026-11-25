@@ -13,10 +13,12 @@ const quoteDateLabel = (value: string) => {
   const [year, month, day] = value.slice(0, 10).split("-");
   return `${day}/${month}/${year}`;
 };
-const tradingViewSearchUrl = (asset: Asset) => {
+const tradingViewChartUrl = (asset: Asset) => {
   const symbol = asset.symbol.replace(/\.US$/i, "");
-  const query = asset.currency === "ARS" && asset.type !== "FCI" ? `BCBA:${symbol}` : symbol;
-  return `https://www.tradingview.com/search/?query=${encodeURIComponent(query)}`;
+  const tradingViewSymbol = asset.currency === "ARS" && asset.type !== "FCI"
+    ? `BCBA:${symbol}`
+    : symbol;
+  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tradingViewSymbol)}`;
 };
 
 export function AssetTable({
@@ -91,10 +93,10 @@ export function AssetTable({
             </td>
             <td className="p-4 text-right">
               <a
-                href={tradingViewSearchUrl(asset)}
+                href={tradingViewChartUrl(asset)}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`Buscar ${asset.symbol} en TradingView`}
+                aria-label={`Abrir gráfico de ${asset.symbol} en TradingView`}
                 className="relative z-10 inline-flex items-center gap-1 text-primary hover:underline"
               >
                 <ExternalLink className="h-4 w-4" aria-hidden="true" />
