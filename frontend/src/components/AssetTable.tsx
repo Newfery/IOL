@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Star } from "lucide-react";
+import { ExternalLink, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Asset } from "@/lib/api";
 
@@ -12,6 +12,11 @@ const fmt = (asset: Asset) =>
 const quoteDateLabel = (value: string) => {
   const [year, month, day] = value.slice(0, 10).split("-");
   return `${day}/${month}/${year}`;
+};
+const tradingViewSearchUrl = (asset: Asset) => {
+  const symbol = asset.symbol.replace(/\.US$/i, "");
+  const query = asset.currency === "ARS" && asset.type !== "FCI" ? `BCBA:${symbol}` : symbol;
+  return `https://www.tradingview.com/search/?query=${encodeURIComponent(query)}`;
 };
 
 export function AssetTable({
@@ -38,12 +43,13 @@ export function AssetTable({
           <th className="p-4">Tipo</th>
           <th className="p-4 text-right">Último</th>
           <th className="p-4 text-right">Var. %</th>
+          <th className="p-4 text-right">TradingView</th>
         </tr>
       </thead>
       <tbody>
         {assets.length === 0 && (
           <tr>
-            <td colSpan={5} className="p-4 text-center text-sm text-muted-foreground">
+            <td colSpan={6} className="p-4 text-center text-sm text-muted-foreground">
               {emptyMessage}
             </td>
           </tr>
@@ -82,6 +88,18 @@ export function AssetTable({
             <td className="p-4 text-right font-mono">{fmt(asset)}</td>
             <td className={`p-4 text-right font-mono ${asset.change >= 0 ? "text-gain" : "text-loss"}`}>
               {asset.change >= 0 ? "+" : ""}{asset.change.toFixed(2)}%
+            </td>
+            <td className="p-4 text-right">
+              <a
+                href={tradingViewSearchUrl(asset)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Buscar ${asset.symbol} en TradingView`}
+                className="relative z-10 inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                Abrir
+              </a>
             </td>
           </tr>
         ))}
