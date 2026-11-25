@@ -36,6 +36,7 @@ function MisInversiones() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [page, setPage] = useState(1);
+  const [compositionCurrency, setCompositionCurrency] = useState<Asset["currency"]>("ARS");
 
   useEffect(() => {
     if (!user) return;
@@ -77,6 +78,16 @@ function MisInversiones() {
   const totalUsdPnl = usdRows.reduce((s, r) => s + r.pnl, 0);
   const arsPieData = arsRows.map((r) => ({ name: r.symbol, value: r.value }));
   const usdPieData = usdRows.map((r) => ({ name: r.symbol, value: r.value }));
+  useEffect(() => {
+    if (compositionCurrency === "ARS" && arsRows.length === 0 && usdRows.length > 0) {
+      setCompositionCurrency("USD");
+    } else if (compositionCurrency === "USD" && usdRows.length === 0 && arsRows.length > 0) {
+      setCompositionCurrency("ARS");
+    }
+  }, [compositionCurrency, arsRows.length, usdRows.length]);
+  const compositionRows = compositionCurrency === "ARS" ? arsRows : usdRows;
+  const compositionPieData = compositionCurrency === "ARS" ? arsPieData : usdPieData;
+  const compositionTotal = compositionCurrency === "ARS" ? totalArsValue : totalUsdValue;
   const pageCount = Math.ceil(rows.length / PAGE_SIZE);
   const currentPage = Math.min(page, Math.max(1, pageCount));
   const pageStart = (currentPage - 1) * PAGE_SIZE;
@@ -110,38 +121,56 @@ function MisInversiones() {
 
         {rows.length > 0 && (
           <section className="rounded-xl border border-border bg-card p-6">
-            <h2 className="mb-2 font-display text-lg font-semibold">Composición de la cartera</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-display text-lg font-semibold">Composición de la cartera</h2>
+              <div role="group" aria-label="Moneda de la composición" className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={compositionCurrency === "ARS" ? "default" : "outline"}
+                  aria-pressed={compositionCurrency === "ARS"}
+                  disabled={arsRows.length === 0}
+                  onClick={() => setCompositionCurrency("ARS")}
+                >
+                  ARS
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={compositionCurrency === "USD" ? "default" : "outline"}
+                  aria-pressed={compositionCurrency === "USD"}
+                  disabled={usdRows.length === 0}
+                  onClick={() => setCompositionCurrency("USD")}
+                >
+                  USD
+                </Button>
+              </div>
+            </div>
             <div className="grid items-start gap-8 md:grid-cols-2">
               <div className="space-y-6">
-                {[
-                  { label: "ARS", currency: "ARS" as const, data: arsPieData },
-                  { label: "USD", currency: "USD" as const, data: usdPieData },
-                ].filter((chart) => chart.data.length > 0).map((chart) => (
-                  <div key={chart.currency}>
-                    <h3 className="text-sm font-semibold text-muted-foreground">Posiciones en {chart.label}</h3>
-                    <div className="mx-auto h-72 max-w-md">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={chart.data} dataKey="value" nameKey="name" innerRadius={55} outerRadius={100} paddingAngle={0} minAngle={8} stroke="var(--background)" strokeWidth={2}>
-                            {chart.data.map((entry) => (
-                              <Cell key={entry.name} fill={getAssetColor(colorBySymbol, entry.name)} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            formatter={(v: number) => fmt(v, chart.currency)}
-                            contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)" }}
-                            itemStyle={{ color: "var(--foreground)" }}
-                            labelStyle={{ color: "var(--foreground)" }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground">Posiciones en {compositionCurrency}</h3>
+                  <div className="mx-auto h-72 max-w-md">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={compositionPieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={100} paddingAngle={0} minAngle={8} stroke="var(--background)" strokeWidth={2}>
+                          {compositionPieData.map((entry) => (
+                            <Cell key={entry.name} fill={getAssetColor(colorBySymbol, entry.name)} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(v: number) => fmt(v, compositionCurrency)}
+                          contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--foreground)" }}
+                          itemStyle={{ color: "var(--foreground)" }}
+                          labelStyle={{ color: "var(--foreground)" }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                ))}
+                </div>
               </div>
               <ul className="max-h-72 space-y-3 overflow-y-auto text-sm md:pt-1">
-                {rows.map((r) => {
-                  const currencyTotal = r.currency === "ARS" ? totalArsValue : totalUsdValue;
+                {compositionRows.map((r) => {
                   return (
                     <li key={r.symbol} className="flex items-center justify-between gap-4">
                       <span className="flex min-w-0 items-center gap-2">
@@ -150,7 +179,7 @@ function MisInversiones() {
                         <span className="truncate text-muted-foreground">{r.name}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">{r.currency}</span>
                       </span>
-                      <span className="shrink-0 font-mono">{(currencyTotal ? (r.value / currencyTotal) * 100 : 0).toFixed(1)}%</span>
+                      <span className="shrink-0 font-mono">{(compositionTotal ? (r.value / compositionTotal) * 100 : 0).toFixed(1)}%</span>
                     </li>
                   );
                 })}
