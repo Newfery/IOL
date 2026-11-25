@@ -192,26 +192,40 @@ function Home() {
 
         <section>
           <h2 className="mb-3 font-display text-lg font-semibold">Disponible para invertir</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-xl border border-border bg-card p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Pesos</p>
-              <p className="mt-2 font-display text-2xl font-semibold">{cuenta ? ars(cuenta.saldo_ars) : "—"}</p>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="min-w-0 rounded-xl border border-border bg-card p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Pesos</p>
+                <p className="mt-2 break-all font-display text-xl font-semibold tabular-nums sm:text-2xl">
+                  {cuenta ? ars(cuenta.saldo_ars) : "—"}
+                </p>
+              </div>
+              <div className="min-w-0 rounded-xl border border-border bg-card p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Dólares</p>
+                <p className="mt-2 break-all font-display text-xl font-semibold tabular-nums sm:text-2xl">
+                  {cuenta ? usd(cuenta.saldo_usd) : "—"}
+                </p>
+              </div>
             </div>
-            <div className="rounded-xl border border-border bg-card p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Dólares</p>
-              <p className="mt-2 font-display text-2xl font-semibold">{cuenta ? usd(cuenta.saldo_usd) : "—"}</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Movimientos de dinero">
+              <Button
+                size="lg"
+                onClick={() => openMoneyDialog("deposit")}
+                className="h-full min-h-14 w-full whitespace-nowrap px-3 text-sm sm:text-base [&_svg]:size-4"
+              >
+                <ArrowDownToLine />Ingresar plata
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => openMoneyDialog("withdraw")}
+                className="h-full min-h-14 w-full whitespace-nowrap px-3 text-sm sm:text-base [&_svg]:size-4"
+              >
+                <ArrowUpFromLine />Retirar plata
+              </Button>
             </div>
           </div>
         </section>
-
-        <div className="mx-auto grid w-full max-w-2xl grid-cols-1 justify-center gap-4 py-2 sm:grid-cols-2" aria-label="Movimientos de dinero">
-          <Button size="lg" onClick={() => openMoneyDialog("deposit")} className="h-16 w-full px-6 text-lg [&_svg]:size-5">
-            <ArrowDownToLine />Ingresar plata
-          </Button>
-          <Button size="lg" variant="outline" onClick={() => openMoneyDialog("withdraw")} className="h-16 w-full px-6 text-lg [&_svg]:size-5">
-            <ArrowUpFromLine />Retirar plata
-          </Button>
-        </div>
 
         <section className="border-t border-border pt-6">
           <div className="pb-4">
