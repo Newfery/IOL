@@ -1,8 +1,9 @@
 import { RequireAuth } from "@/components/RequireAuth";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeftRight, Plus, UserPlus } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Plus, Search, UserPlus } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
+import { Button } from "@/components/ui/button";
 import {
   contributeToGroup,
   createGroup,
@@ -15,6 +16,7 @@ import {
   type Group,
   type Moneda,
 } from "@/lib/api";
+import { CATEGORIES } from "@/lib/categories";
 
 export const Route = createFileRoute("/grupos")({
   head: () => ({
@@ -39,6 +41,8 @@ const fmt = (n: number) =>
 const fmtUsd = (n: number) =>
   n.toLocaleString("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
 
+const BUY_PAGE_SIZE = 20;
+
 function Grupos() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -55,6 +59,10 @@ function Grupos() {
   const [quoteError, setQuoteError] = useState("");
   const [symbol, setSymbol] = useState("");
   const [qty, setQty] = useState(1);
+  const [buyScreen, setBuyScreen] = useState(false);
+  const [buySearch, setBuySearch] = useState("");
+  const [buyCategory, setBuyCategory] = useState("todos");
+  const [buyPage, setBuyPage] = useState(1);
   const [msg, setMsg] = useState("");
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [groupsError, setGroupsError] = useState("");
@@ -105,6 +113,21 @@ function Grupos() {
       : asset.currency === "USD"
         ? exchangeRate === null ? null : asset.price * qty * exchangeRate * 1.005
         : asset.price * qty * 1.005;
+  const selectedBuyCategory = CATEGORIES.find((category) => category.slug === buyCategory);
+  const buyQuery = buySearch.trim().toLowerCase();
+  const matchingBuyAssets = assets.filter((availableAsset) =>
+    (!selectedBuyCategory || selectedBuyCategory.matches(availableAsset))
+    && (!buyQuery
+      || availableAsset.symbol.toLowerCase().includes(buyQuery)
+      || availableAsset.name.toLowerCase().includes(buyQuery)),
+  );
+  const buyPageCount = Math.ceil(matchingBuyAssets.length / BUY_PAGE_SIZE);
+  const currentBuyPage = Math.min(buyPage, Math.max(1, buyPageCount));
+  const buyPageAssets = matchingBuyAssets.slice(
+    (currentBuyPage - 1) * BUY_PAGE_SIZE,
+    currentBuyPage * BUY_PAGE_SIZE,
+  );
+  const buyCategories = CATEGORIES.filter((category) => category.type !== "Favoritos");
 
   async function onCreate() {
     if (!newName.trim()) return setMsg("Poné un nombre para el grupo.");
@@ -244,7 +267,10 @@ function Grupos() {
               <p className="text-sm text-muted-foreground">Todavía no pertenecés a ningún grupo.</p>
             )}
             {groups.map((g) => (
-              <button key={g.id} onClick={() => setActiveId(g.id)}
+              <button key={g.id} onClick={() => {
+                setActiveId(g.id);
+                setBuyScreen(false);
+              }}
                 className={`w-full rounded-lg border border-border p-3 text-left text-sm ${g.id === activeId ? "bg-muted" : "bg-card"}`}>
                 <div className="font-semibold">{g.name}</div>
                 <div className="text-xs text-muted-foreground">{g.members.length} miembros</div>
@@ -283,6 +309,126 @@ function Grupos() {
                 </p>
               )}
 
+              {buyScreen ? (
+                <section className="space-y-5 rounded-xl border border-border bg-card p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h2 className="font-display text-xl font-semibold">Elegí un activo</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Explorá las categorías o buscá por nombre o símbolo.
+                      </p>
+                    </div>
+                    <Button type="button" variant="outline" onClick={() => setBuyScreen(false)}>
+                      <ArrowLeft aria-hidden="true" />
+                      Volver al grupo
+                    </Button>
+                  </div>
+                  <div className="relative max-w-md">
+                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="search"
+                      aria-label="Buscar activo por nombre o símbolo"
+                      value={buySearch}
+                      onChange={(event) => {
+                        setBuySearch(event.target.value);
+                        setBuyPage(1);
+                      }}
+                      placeholder="Buscar por nombre o símbolo"
+                      className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="Categorías de activos">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={buyCategory === "todos" ? "default" : "outline"}
+                      aria-pressed={buyCategory === "todos"}
+                      onClick={() => {
+                        setBuyCategory("todos");
+                        setBuyPage(1);
+                      }}
+                    >
+                      Todos
+                    </Button>
+                    {buyCategories.map((category) => (
+                      <Button
+                        key={category.slug}
+                        type="button"
+                        size="sm"
+                        variant={buyCategory === category.slug ? "default" : "outline"}
+                        aria-pressed={buyCategory === category.slug}
+                        onClick={() => {
+                          setBuyCategory(category.slug);
+                          setBuyPage(1);
+                        }}
+                      >
+                        {category.label}
+                      </Button>
+                    ))}
+                  </div>
+                  {assetsError && <p role="alert" className="text-sm text-loss">{assetsError}</p>}
+                  {buyPageAssets.length > 0 ? (
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {buyPageAssets.map((availableAsset) => (
+                        <article key={availableAsset.symbol} className="flex min-w-0 flex-col justify-between gap-4 rounded-lg border border-border p-4">
+                          <div>
+                            <p className="font-semibold">{availableAsset.symbol}</p>
+                            <p className="mt-1 min-h-10 text-sm text-muted-foreground">{availableAsset.name}</p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {availableAsset.type} · {availableAsset.currency}
+                            </p>
+                            <p className="mt-1 font-mono text-sm">
+                              {availableAsset.currency === "USD" ? fmtUsd(availableAsset.price) : fmt(availableAsset.price)}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              setSymbol(availableAsset.symbol);
+                              setBuyScreen(false);
+                            }}
+                          >
+                            Elegir activo
+                          </Button>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      {assets.length === 0 ? "No hay activos disponibles." : "No hay activos que coincidan con la búsqueda."}
+                    </p>
+                  )}
+                  {buyPageCount > 1 && (
+                    <nav aria-label="Paginación de activos para la compra" className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                      <p aria-live="polite" className="text-sm text-muted-foreground">
+                        Mostrando {(currentBuyPage - 1) * BUY_PAGE_SIZE + 1}–{Math.min(currentBuyPage * BUY_PAGE_SIZE, matchingBuyAssets.length)} de {matchingBuyAssets.length} activos
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={currentBuyPage === 1}
+                          onClick={() => setBuyPage(currentBuyPage - 1)}
+                        >
+                          Anterior
+                        </Button>
+                        <span className="text-sm">Página {currentBuyPage} de {buyPageCount}</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={currentBuyPage === buyPageCount}
+                          onClick={() => setBuyPage(currentBuyPage + 1)}
+                        >
+                          Siguiente
+                        </Button>
+                      </div>
+                    </nav>
+                  )}
+                </section>
+              ) : (
+                <>
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="rounded-xl border border-border bg-card p-5">
                   <h2 className="font-display text-lg font-semibold">Miembros y aportes</h2>
@@ -334,15 +480,24 @@ function Grupos() {
                 <div className="rounded-xl border border-border bg-card p-5">
                   <h2 className="font-display text-lg font-semibold">Comprar con el pozo</h2>
                   {assetsError && <p role="alert" className="mt-2 text-sm text-loss">{assetsError}</p>}
-                  <select value={symbol} onChange={(e) => setSymbol(e.target.value)}
-                    className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    {assets.map((a) => (
-                      <option key={a.symbol} value={a.symbol}>
-                        {a.symbol} — {a.name} ({a.symbol.endsWith(".US") ? "EE. UU. · USD" : a.currency})
-                      </option>
-                    ))}
-                  </select>
-                  <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
+                  {asset ? (
+                    <div className="mt-3 rounded-lg border border-border bg-background p-3">
+                      <p className="font-semibold">{asset.symbol} — {asset.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{asset.type} · {asset.currency}</p>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-muted-foreground">Todavía no elegiste un activo.</p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-3 w-full"
+                    disabled={assets.length === 0}
+                    onClick={() => setBuyScreen(true)}
+                  >
+                    {asset ? "Cambiar activo" : "Elegir activo"}
+                  </Button>
+                  <input type="number" min={1} value={qty} disabled={!asset} onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
                     className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
                   <div className="mt-3 flex justify-between text-sm">
                     <span className="text-muted-foreground">
@@ -367,7 +522,7 @@ function Grupos() {
                       {quoteError || "No hay una cotización MEP disponible para estimar el débito en ARS."}
                     </p>
                   )}
-                  <button onClick={onBuy} className="mt-4 w-full rounded-md bg-gain py-2 font-semibold text-background">Comprar para el grupo</button>
+                  <button disabled={!asset} onClick={onBuy} className="mt-4 w-full rounded-md bg-gain py-2 font-semibold text-background disabled:cursor-not-allowed disabled:opacity-50">Comprar para el grupo</button>
                 </div>
               </div>
 
@@ -405,6 +560,8 @@ function Grupos() {
                   </ul>
                 )}
               </div>
+                </>
+              )}
             </div>
           )}
         </section>
