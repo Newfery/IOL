@@ -31,6 +31,11 @@ export const Route = createFileRoute("/")({
 type Moneda = "ARS" | "MEP" | "CCL";
 const ars = (n: number) => n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 2 });
 const usd = (n: number) => `US$ ${n.toLocaleString("es-AR", { maximumFractionDigits: 2 })}`;
+const signedMoney = (n: number, currency: "ARS" | "USD") => {
+  const sign = n >= 0 ? "+" : "-";
+  const absolute = Math.abs(n);
+  return `${sign}${currency === "USD" ? usd(absolute) : ars(absolute)}`;
+};
 
 function Home() {
   const { user } = useAuth();
@@ -254,8 +259,8 @@ function Home() {
                             <span className="mt-1 block break-words text-xs text-muted-foreground">{r.name}</span>
                           </span>
                         </span>
-                        <span className={`shrink-0 font-mono text-base font-semibold ${r.pnl >= 0 ? "text-gain" : "text-loss"}`}>
-                          {r.pnl >= 0 ? "+" : ""}{r.pnlPct.toFixed(1)}%
+                        <span className={`shrink-0 whitespace-nowrap text-right font-mono text-base font-semibold ${r.pnl >= 0 ? "text-gain" : "text-loss"}`}>
+                          {signedMoney(r.pnl, r.currency)} ({r.pnlPct >= 0 ? "+" : ""}{r.pnlPct.toFixed(1)}%)
                         </span>
                       </li>
                     );
