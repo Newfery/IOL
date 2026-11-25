@@ -1,13 +1,16 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { AssetTable } from "@/components/AssetTable";
 import { RequireAuth } from "@/components/RequireAuth";
+import { Button } from "@/components/ui/button";
 import { getAssets, type Asset } from "@/lib/api";
 import { findCategory } from "@/lib/categories";
 import { useAuth } from "@/lib/auth";
 import { useFavorites } from "@/lib/use-favorites";
+
+const PAGE_SIZE = 20;
 
 export const Route = createFileRoute("/operar_/$categoria")({
   head: ({ params }) => {
@@ -41,6 +44,7 @@ function CategoryPage() {
   const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const {
@@ -71,6 +75,10 @@ function CategoryPage() {
     };
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [categoria]);
+
   const categoryAssets = category?.type === "Favoritos"
     ? assets.filter((asset) => favorites.includes(asset.symbol))
     : assets.filter((asset) => category?.matches(asset) ?? false);
@@ -80,6 +88,9 @@ function CategoryPage() {
       || asset.symbol.toLowerCase().includes(query)
       || asset.name.toLowerCase().includes(query),
   );
+  const pageCount = Math.ceil(shown.length / PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(1, pageCount));
+  const pageAssets = shown.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const emptyMessage = category?.type === "Favoritos" && !query
     ? "Todavía no tenés favoritos. Marcá activos con la estrella."
     : query
@@ -109,7 +120,10 @@ function CategoryPage() {
             <input
               type="search"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
               placeholder="Buscar por nombre o símbolo"
               className="w-full rounded-md border border-input bg-card py-2 pl-9 pr-3 text-sm"
             />
@@ -125,7 +139,7 @@ function CategoryPage() {
         {showTable && (
           <section className="overflow-x-auto rounded-lg border border-border bg-card">
             <AssetTable
-              assets={shown}
+              assets={pageAssets}
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
               emptyMessage={emptyMessage}
@@ -133,6 +147,53 @@ function CategoryPage() {
               favoriteActionsDisabled={favoritesLoading || Boolean(favoritesLoadError)}
             />
           </section>
+        )}
+        {showTable && pageCount > 1 && (
+          <nav aria-label="Paginación de activos" className="flex flex-wrap items-center justify-between gap-4">
+            <p aria-live="polite" className="text-sm text-muted-foreground">
+              Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, shown.length)} de {shown.length} activos
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label="Página anterior"
+                disabled={currentPage === 1}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                <ChevronLeft aria-hidden="true" />
+                Anterior
+              </Button>
+              {Array.from({ length: pageCount }, (_, index) => {
+                const pageNumber = index + 1;
+                return (
+                  <Button
+                    key={pageNumber}
+                    type="button"
+                    variant={pageNumber === currentPage ? "default" : "outline"}
+                    size="sm"
+                    aria-label={`Página ${pageNumber}`}
+                    aria-current={pageNumber === currentPage ? "page" : undefined}
+                    onClick={() => setPage(pageNumber)}
+                  >
+                    {pageNumber}
+                  </Button>
+                );
+              })}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label="Página siguiente"
+                disabled={currentPage === pageCount}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                Siguiente
+                <ChevronRight aria-hidden="true" />
+              </Button>
+            </div>
+          </nav>
         )}
       </main>
     </div>
