@@ -6,6 +6,7 @@ from decimal import Decimal, InvalidOperation
 import json
 import logging
 from urllib.error import URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -36,12 +37,25 @@ class Data912ProviderError(RuntimeError):
     pass
 
 
+class Data912HistoryNotFoundError(Data912ProviderError):
+    pass
+
+
 @dataclass(frozen=True)
 class Data912Quote:
     ticker: str
     price: Decimal
     change: Decimal
     quote_date: date
+
+
+@dataclass(frozen=True)
+class Data912HistoricalQuote:
+    quote_date: date
+    price: Decimal
+    open: Decimal | None
+    high: Decimal | None
+    low: Decimal | None
 
 
 def _positive_decimal(value: object) -> Decimal | None:
@@ -52,6 +66,63 @@ def _positive_decimal(value: object) -> Decimal | None:
     if not number.is_finite() or number <= 0:
         return None
     return number
+
+
+def parse_data912_bond_history(
+    payload: object,
+    ticker: str,
+) -> list[Data912HistoricalQuote]:
+    if isinstance(payload, dict) and payload.get("Error"):
+        raise Data912HistoryNotFoundError(
+            f"Data912 no tiene historial para {ticker}: {payload['Error']}"
+        )
+    if not isinstance(payload, list) or not payload:
+        raise Data912HistoryNotFoundError(f"Data912 no devolvió historial para {ticker}")
+
+    quotes = []
+    for item in payload:
+        if not isinstance(item, dict):
+            raise Data912ProviderError(f"Data912 devolvió una fila histórica inválida para {ticker}")
+        try:
+            quote_date = date.fromisoformat(str(item["date"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise Data912ProviderError(f"Data912 devolvió una fecha inválida para {ticker}") from exc
+
+        price = _positive_decimal(item.get("c"))
+        if price is None:
+            raise Data912ProviderError(f"Data912 devolvió un cierre inválido para {ticker}")
+
+        open_price = _positive_decimal(item.get("o"))
+        high = _positive_decimal(item.get("h"))
+        low = _positive_decimal(item.get("l"))
+        if not all((open_price, high, low)):
+            open_price = high = low = None
+        try:
+            quotes.append(Data912HistoricalQuote(
+                quote_date=quote_date,
+                price=price.quantize(Decimal("0.000001")),
+                open=open_price.quantize(Decimal("0.000001")) if open_price else None,
+                high=high.quantize(Decimal("0.000001")) if high else None,
+                low=low.quantize(Decimal("0.000001")) if low else None,
+            ))
+        except InvalidOperation as exc:
+            raise Data912ProviderError(f"Data912 devolvió una cotización fuera de rango para {ticker}") from exc
+
+    return sorted(quotes, key=lambda quote: quote.quote_date)
+
+
+def fetch_data912_bond_history(ticker: str) -> list[Data912HistoricalQuote]:
+    url = f"{DATA912_BASE_URL}/historical/bonds/{quote(ticker, safe='')}"
+    request = Request(
+        url,
+        headers={"User-Agent": "Invertix/1.0 (bond history)"},
+    )
+    try:
+        with urlopen(request, timeout=DATA912_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read())
+    except (URLError, TimeoutError, OSError, ValueError) as exc:
+        raise Data912ProviderError(f"No se pudo consultar el historial de {ticker} en Data912") from exc
+    return parse_data912_bond_history(payload, ticker)
 
 
 def parse_data912_quotes(

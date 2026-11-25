@@ -10,15 +10,126 @@ from sqlalchemy.orm import sessionmaker
 from src.db.models.activos_model import Activo
 from src.db.models.activo_cotizacion_historica_model import ActivoCotizacionHistorica
 from src.routers.dashboard_router import market_asset_history
+from src.utils.errors import NotFoundError
 from src.services.data912_service import (
     DATA912_ENDPOINTS,
+    Data912HistoricalQuote,
+    Data912HistoryNotFoundError,
     Data912Quote,
+    parse_data912_bond_history,
     parse_data912_quotes,
     sync_data912_quotes,
 )
 
 
 class Data912ServiceTests(unittest.TestCase):
+    def test_bond_history_parser_sorts_rows_and_maps_ohlc(self):
+        quotes = parse_data912_bond_history(
+            [
+                {"date": "2026-11-24", "o": "102.5", "h": "104", "l": "101", "c": "103.25"},
+                {"date": "2026-11-23", "o": "100", "h": "103", "l": "99.5", "c": "102"},
+            ],
+            "AL30",
+        )
+
+        self.assertEqual(
+            quotes,
+            [
+                Data912HistoricalQuote(
+                    date(2026, 11, 23),
+                    Decimal("102.000000"),
+                    Decimal("100.000000"),
+                    Decimal("103.000000"),
+                    Decimal("99.500000"),
+                ),
+                Data912HistoricalQuote(
+                    date(2026, 11, 24),
+                    Decimal("103.250000"),
+                    Decimal("102.500000"),
+                    Decimal("104.000000"),
+                    Decimal("101.000000"),
+                ),
+            ],
+        )
+
+    def test_bond_history_parser_reports_unsupported_ticker(self):
+        with self.assertRaises(Data912HistoryNotFoundError):
+            parse_data912_bond_history(
+                {"Error": "Nahh no tengo ese ticker loko"},
+                "UNKNOWN",
+            )
+
+    def test_bond_history_endpoint_uses_data912_history(self):
+        engine = create_engine("sqlite:///:memory:")
+        Activo.__table__.create(engine)
+        ActivoCotizacionHistorica.__table__.create(engine)
+        db = sessionmaker(bind=engine)()
+        try:
+            db.add(Activo(
+                ticker="AL30",
+                nombre="Bono AL30",
+                tipo="bono",
+                moneda="ARS",
+                precio_actual=Decimal("103"),
+                nivel_riesgo=3,
+            ))
+            db.commit()
+            history = [
+                Data912HistoricalQuote(
+                    date(2026, 11, 23),
+                    Decimal("102"),
+                    Decimal("100"),
+                    Decimal("103"),
+                    Decimal("99.5"),
+                ),
+                Data912HistoricalQuote(
+                    date(2026, 11, 24),
+                    Decimal("103.25"),
+                    Decimal("102.5"),
+                    Decimal("104"),
+                    Decimal("101"),
+                ),
+            ]
+
+            with (
+                patch("src.routers.dashboard_router.fetch_data912_bond_history", return_value=history) as data912,
+                patch("src.routers.dashboard_router.yf.Ticker") as yahoo_ticker,
+            ):
+                quotes = market_asset_history("AL30", db)
+
+            data912.assert_called_once_with("AL30")
+            yahoo_ticker.assert_not_called()
+            self.assertEqual(quotes, [
+                {
+                    "date": "2026-11-23",
+                    "price": 102.0,
+                    "open": 100.0,
+                    "high": 103.0,
+                    "low": 99.5,
+                },
+                {
+                    "date": "2026-11-24",
+                    "price": 103.25,
+                    "open": 102.5,
+                    "high": 104.0,
+                    "low": 101.0,
+                },
+            ])
+
+            with (
+                patch(
+                    "src.routers.dashboard_router.fetch_data912_bond_history",
+                    side_effect=Data912HistoryNotFoundError("unsupported"),
+                ),
+                patch("src.routers.dashboard_router.yf.Ticker") as yahoo_ticker,
+            ):
+                with self.assertRaises(NotFoundError):
+                    market_asset_history("AL30", db)
+            yahoo_ticker.assert_not_called()
+        finally:
+            db.close()
+            engine.dispose()
+
     def test_parser_namespaces_us_tickers_and_uses_available_quote_if_close_is_missing(self):
         payloads = {
             path: [{

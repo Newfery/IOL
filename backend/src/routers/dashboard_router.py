@@ -27,6 +27,11 @@ from src.schemas.frontend_schema import (
 )
 from src.services.operacion_service import OperacionService
 from src.services.dolar_service import DolarQuoteError, DolarQuoteService
+from src.services.data912_service import (
+    Data912HistoryNotFoundError,
+    Data912ProviderError,
+    fetch_data912_bond_history,
+)
 from src.utils.errors import NotFoundError
 from src.utils.hash import hash_password, verify_password
 
@@ -109,6 +114,51 @@ def market_asset_history(symbol: str, db: Session = Depends(get_db)):
         ]
         if asset.tipo == "fci":
             return stored_history
+        if asset.tipo == "bono":
+            try:
+                data912_history = fetch_data912_bond_history(ticker)
+            except Data912HistoryNotFoundError as exc:
+                if stored_history:
+                    logger.warning(
+                        "Data912 no tiene historial para el bono %s; usando cotizaciones locales",
+                        ticker,
+                    )
+                    return stored_history
+                raise NotFoundError(
+                    f"Data912 no tiene historial disponible para el bono {ticker}"
+                ) from exc
+            except Data912ProviderError as exc:
+                if stored_history:
+                    logger.warning(
+                        "No se pudo consultar Data912 para el bono %s; usando cotizaciones locales: %s",
+                        ticker,
+                        exc,
+                    )
+                    return stored_history
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"No se pudo consultar el historial de Data912 para {ticker}",
+                ) from exc
+
+            points_by_date = {
+                quote.quote_date.isoformat(): {
+                    "date": quote.quote_date.isoformat(),
+                    "price": float(quote.price),
+                    **(
+                        {
+                            "open": float(quote.open),
+                            "high": float(quote.high),
+                            "low": float(quote.low),
+                        }
+                        if quote.open is not None and quote.high is not None and quote.low is not None
+                        else {}
+                    ),
+                }
+                for quote in data912_history
+            }
+            for point in stored_history:
+                points_by_date.setdefault(point["date"], point)
+            return [points_by_date[day] for day in sorted(points_by_date)]
 
     if ticker.endswith(".US"):
         market_symbol = ticker[:-3]
