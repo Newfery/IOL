@@ -76,6 +76,13 @@ selección amplia, no la totalidad de sus símbolos. Las acciones y ETFs de EE. 
 se guardan en USD con sufijo `.US` para distinguirlos de CEDEARs con el mismo
 ticker.
 
+### Historial gráfico de CEDEARs
+
+El endpoint `GET /api/market/assets/{ticker}/history` consulta el historial
+local de CEDEARs en Data912 y lo combina con las cotizaciones guardadas. Si
+Data912 no tiene datos para un ticker o no responde, usa el historial diario de
+Yahoo Finance como alternativa.
+
 ### Cuotapartes de FCI
 
 Los fondos y sus valores de cuotaparte se importan desde la planilla diaria

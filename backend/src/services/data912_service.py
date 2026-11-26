@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 import json
 import logging
+from typing import Literal
 from urllib.error import URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -31,6 +32,8 @@ DATA912_ENDPOINTS = (
     ("/live/usa_adrs", True),
     ("/live/usa_stocks", True),
 )
+# Existing databases may still store Disney under its former ticker.
+DATA912_CEDEAR_TICKER_ALIASES = {"DIS": "DISN"}
 
 
 class Data912ProviderError(RuntimeError):
@@ -68,7 +71,7 @@ def _positive_decimal(value: object) -> Decimal | None:
     return number
 
 
-def parse_data912_bond_history(
+def parse_data912_history(
     payload: object,
     ticker: str,
 ) -> list[Data912HistoricalQuote]:
@@ -111,18 +114,38 @@ def parse_data912_bond_history(
     return sorted(quotes, key=lambda quote: quote.quote_date)
 
 
-def fetch_data912_bond_history(ticker: str) -> list[Data912HistoricalQuote]:
-    url = f"{DATA912_BASE_URL}/historical/bonds/{quote(ticker, safe='')}"
+def parse_data912_bond_history(
+    payload: object,
+    ticker: str,
+) -> list[Data912HistoricalQuote]:
+    return parse_data912_history(payload, ticker)
+
+
+def fetch_data912_history(
+    ticker: str,
+    market: Literal["bonds", "cedears"],
+) -> list[Data912HistoricalQuote]:
+    url = f"{DATA912_BASE_URL}/historical/{market}/{quote(ticker, safe='')}"
     request = Request(
         url,
-        headers={"User-Agent": "Invertix/1.0 (bond history)"},
+        headers={"User-Agent": "Invertix/1.0 (market history)"},
     )
     try:
         with urlopen(request, timeout=DATA912_TIMEOUT_SECONDS) as response:
             payload = json.loads(response.read())
     except (URLError, TimeoutError, OSError, ValueError) as exc:
         raise Data912ProviderError(f"No se pudo consultar el historial de {ticker} en Data912") from exc
-    return parse_data912_bond_history(payload, ticker)
+    return parse_data912_history(payload, ticker)
+
+
+def fetch_data912_bond_history(ticker: str) -> list[Data912HistoricalQuote]:
+    return fetch_data912_history(ticker, "bonds")
+
+
+def fetch_data912_cedear_history(ticker: str) -> list[Data912HistoricalQuote]:
+    normalized_ticker = ticker.strip().upper()
+    market_ticker = DATA912_CEDEAR_TICKER_ALIASES.get(normalized_ticker, normalized_ticker)
+    return fetch_data912_history(market_ticker, "cedears")
 
 
 def parse_data912_quotes(

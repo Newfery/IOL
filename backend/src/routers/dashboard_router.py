@@ -28,9 +28,11 @@ from src.schemas.frontend_schema import (
 from src.services.operacion_service import OperacionService
 from src.services.dolar_service import DolarQuoteError, DolarQuoteService
 from src.services.data912_service import (
+    Data912HistoricalQuote,
     Data912HistoryNotFoundError,
     Data912ProviderError,
     fetch_data912_bond_history,
+    fetch_data912_cedear_history,
 )
 from src.utils.errors import NotFoundError
 from src.utils.hash import hash_password, verify_password
@@ -38,6 +40,28 @@ from src.utils.hash import hash_password, verify_password
 router = APIRouter(tags=["frontend"])
 logger = logging.getLogger(__name__)
 MIN_BOND_HISTORY_POINTS = 3
+
+
+def _merge_data912_history(
+    data912_history: list[Data912HistoricalQuote],
+    stored_history: list[dict[str, str | float]],
+) -> list[dict[str, str | float]]:
+    points_by_date: dict[str, dict[str, str | float]] = {}
+    for quote in data912_history:
+        point: dict[str, str | float] = {
+            "date": quote.quote_date.isoformat(),
+            "price": float(quote.price),
+        }
+        if quote.open is not None and quote.high is not None and quote.low is not None:
+            point.update({
+                "open": float(quote.open),
+                "high": float(quote.high),
+                "low": float(quote.low),
+            })
+        points_by_date[quote.quote_date.isoformat()] = point
+    for point in stored_history:
+        points_by_date.setdefault(str(point["date"]), point)
+    return [points_by_date[day] for day in sorted(points_by_date)]
 
 
 def _group_payload(db: Session, group: GrupoDeInversion) -> dict:
@@ -115,6 +139,23 @@ def market_asset_history(symbol: str, db: Session = Depends(get_db)):
         ]
         if asset.tipo == "fci":
             return stored_history
+        if asset.tipo == "cedear":
+            try:
+                data912_history = fetch_data912_cedear_history(ticker)
+            except Data912HistoryNotFoundError as exc:
+                logger.warning(
+                    "Data912 no tiene historial para el CEDEAR %s; usando otras fuentes: %s",
+                    ticker,
+                    exc,
+                )
+            except Data912ProviderError as exc:
+                logger.warning(
+                    "No se pudo consultar Data912 para el CEDEAR %s; usando otras fuentes: %s",
+                    ticker,
+                    exc,
+                )
+            else:
+                return _merge_data912_history(data912_history, stored_history)
         if asset.tipo == "bono":
             try:
                 data912_history = fetch_data912_bond_history(ticker)
@@ -141,29 +182,12 @@ def market_asset_history(symbol: str, db: Session = Depends(get_db)):
                     detail=f"No se pudo consultar el historial de Data912 para {ticker}",
                 ) from exc
 
-            points_by_date = {
-                quote.quote_date.isoformat(): {
-                    "date": quote.quote_date.isoformat(),
-                    "price": float(quote.price),
-                    **(
-                        {
-                            "open": float(quote.open),
-                            "high": float(quote.high),
-                            "low": float(quote.low),
-                        }
-                        if quote.open is not None and quote.high is not None and quote.low is not None
-                        else {}
-                    ),
-                }
-                for quote in data912_history
-            }
-            for point in stored_history:
-                points_by_date.setdefault(point["date"], point)
-            if len(points_by_date) < MIN_BOND_HISTORY_POINTS:
+            merged_history = _merge_data912_history(data912_history, stored_history)
+            if len(merged_history) < MIN_BOND_HISTORY_POINTS:
                 raise NotFoundError(
                     f"No hay suficientes datos históricos de Data912 para el bono {ticker}"
                 )
-            return [points_by_date[day] for day in sorted(points_by_date)]
+            return merged_history
 
     if ticker.endswith(".US"):
         market_symbol = ticker[:-3]

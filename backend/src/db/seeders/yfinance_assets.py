@@ -63,7 +63,7 @@ CATALOG = [
     ("AMZN", "AMZN.BA", "Amazon (CEDEAR)", "cedear"),
     ("AMD", "AMD.BA", "AMD (CEDEAR)", "cedear"),
     ("BABA", "BABA.BA", "Alibaba (CEDEAR)", "cedear"),
-    ("DIS", "DIS.BA", "Disney (CEDEAR)", "cedear"),
+    ("DISN", "DISN.BA", "Disney (CEDEAR)", "cedear"),
     ("GOOGL", "GOOGL.BA", "Alphabet (CEDEAR)", "cedear"),
     ("INTC", "INTC.BA", "Intel (CEDEAR)", "cedear"),
     ("JPM", "JPM.BA", "JPMorgan (CEDEAR)", "cedear"),

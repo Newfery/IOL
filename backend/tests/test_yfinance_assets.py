@@ -2,12 +2,18 @@ import unittest
 from unittest.mock import patch
 
 from src.db.seeders.yfinance_assets import (
+    CATALOG,
     US_EQUITY_PAGE_SIZE,
     fetch_us_equities,
 )
 
 
 class YahooAssetCatalogTests(unittest.TestCase):
+    def test_disney_cedear_uses_the_current_market_ticker(self):
+        disney = next(asset for asset in CATALOG if asset[2] == "Disney (CEDEAR)")
+
+        self.assertEqual(disney[:2], ("DISN", "DISN.BA"))
+
     @patch("src.db.seeders.yfinance_assets.yf.screen")
     def test_fetch_us_equities_paginates_and_namespaces_us_symbols(self, screen):
         def quote(symbol: str, quote_type: str = "EQUITY") -> dict[str, object]:

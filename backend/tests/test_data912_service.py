@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -16,6 +16,7 @@ from src.services.data912_service import (
     Data912HistoricalQuote,
     Data912HistoryNotFoundError,
     Data912Quote,
+    fetch_data912_cedear_history,
     parse_data912_bond_history,
     parse_data912_quotes,
     sync_data912_quotes,
@@ -58,6 +59,25 @@ class Data912ServiceTests(unittest.TestCase):
                 {"Error": "Nahh no tengo ese ticker loko"},
                 "UNKNOWN",
             )
+
+    def test_fetch_cedear_history_uses_data912_cedear_endpoint(self):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = (
+            b'[{"date":"2026-11-24","c":"100"}]'
+        )
+        with patch(
+            "src.services.data912_service.urlopen",
+            return_value=response,
+        ) as urlopen_mock:
+            quotes = fetch_data912_cedear_history("DIS")
+
+        request = urlopen_mock.call_args.args[0]
+        self.assertEqual(
+            request.full_url,
+            "https://data912.com/historical/cedears/DISN",
+        )
+        self.assertEqual(len(quotes), 1)
+        self.assertEqual(quotes[0].price, Decimal("100.000000"))
 
     def test_bond_history_endpoint_uses_data912_history(self):
         engine = create_engine("sqlite:///:memory:")
@@ -154,6 +174,145 @@ class Data912ServiceTests(unittest.TestCase):
                 with self.assertRaisesRegex(NotFoundError, "No hay suficientes datos históricos"):
                     market_asset_history("AL30", db)
             yahoo_ticker.assert_not_called()
+        finally:
+            db.close()
+            engine.dispose()
+
+    def test_cedear_history_endpoint_uses_data912_and_merges_stored_quotes(self):
+        engine = create_engine("sqlite:///:memory:")
+        Activo.__table__.create(engine)
+        ActivoCotizacionHistorica.__table__.create(engine)
+        db = sessionmaker(bind=engine)()
+        try:
+            asset = Activo(
+                ticker="AAPL",
+                nombre="Apple (CEDEAR)",
+                tipo="cedear",
+                moneda="ARS",
+                precio_actual=Decimal("104"),
+                nivel_riesgo=3,
+            )
+            db.add(asset)
+            db.commit()
+            db.add_all([
+                ActivoCotizacionHistorica(
+                    activo_id=asset.id,
+                    fecha=date(2026, 11, 23),
+                    precio=Decimal("999"),
+                ),
+                ActivoCotizacionHistorica(
+                    activo_id=asset.id,
+                    fecha=date(2026, 11, 25),
+                    precio=Decimal("104"),
+                ),
+            ])
+            db.commit()
+            history = [
+                Data912HistoricalQuote(
+                    date(2026, 11, 22),
+                    Decimal("101"),
+                    Decimal("100"),
+                    Decimal("102"),
+                    Decimal("99"),
+                ),
+                Data912HistoricalQuote(
+                    date(2026, 11, 23),
+                    Decimal("102"),
+                    Decimal("101"),
+                    Decimal("103"),
+                    Decimal("100"),
+                ),
+                Data912HistoricalQuote(
+                    date(2026, 11, 24),
+                    Decimal("103"),
+                    Decimal("102"),
+                    Decimal("104"),
+                    Decimal("101"),
+                ),
+            ]
+
+            with (
+                patch(
+                    "src.routers.dashboard_router.fetch_data912_cedear_history",
+                    return_value=history,
+                ) as data912,
+                patch("src.routers.dashboard_router.yf.Ticker") as yahoo_ticker,
+            ):
+                quotes = market_asset_history("AAPL", db)
+
+            data912.assert_called_once_with("AAPL")
+            yahoo_ticker.assert_not_called()
+            self.assertEqual(
+                quotes,
+                [
+                    {
+                        "date": "2026-11-22",
+                        "price": 101.0,
+                        "open": 100.0,
+                        "high": 102.0,
+                        "low": 99.0,
+                    },
+                    {
+                        "date": "2026-11-23",
+                        "price": 102.0,
+                        "open": 101.0,
+                        "high": 103.0,
+                        "low": 100.0,
+                    },
+                    {
+                        "date": "2026-11-24",
+                        "price": 103.0,
+                        "open": 102.0,
+                        "high": 104.0,
+                        "low": 101.0,
+                    },
+                    {"date": "2026-11-25", "price": 104.0},
+                ],
+            )
+        finally:
+            db.close()
+            engine.dispose()
+
+    def test_cedear_history_falls_back_to_yahoo_when_data912_has_no_history(self):
+        engine = create_engine("sqlite:///:memory:")
+        Activo.__table__.create(engine)
+        ActivoCotizacionHistorica.__table__.create(engine)
+        db = sessionmaker(bind=engine)()
+        try:
+            db.add(Activo(
+                ticker="NOHIST",
+                nombre="Disney (CEDEAR)",
+                tipo="cedear",
+                moneda="ARS",
+                precio_actual=Decimal("100"),
+                nivel_riesgo=3,
+            ))
+            db.commit()
+            with (
+                patch(
+                    "src.routers.dashboard_router.fetch_data912_cedear_history",
+                    side_effect=Data912HistoryNotFoundError("Data912 no tiene historial"),
+                ),
+                patch("src.routers.dashboard_router.yf.Ticker") as yahoo_ticker,
+            ):
+                yahoo_ticker.return_value.history.return_value = pd.DataFrame(
+                    {"Close": [99.0, 100.0]},
+                    index=pd.to_datetime(["2026-11-24", "2026-11-25"]),
+                )
+                quotes = market_asset_history("NOHIST", db)
+
+            yahoo_ticker.return_value.history.assert_called_once_with(
+                period="1y",
+                interval="1d",
+                auto_adjust=False,
+            )
+            self.assertEqual(
+                quotes,
+                [
+                    {"date": "2026-11-24T00:00:00", "price": 99.0},
+                    {"date": "2026-11-25T00:00:00", "price": 100.0},
+                ],
+            )
         finally:
             db.close()
             engine.dispose()
