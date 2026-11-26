@@ -11,6 +11,7 @@ from src.db.models.activos_model import Activo
 from src.db.models.activo_cotizacion_historica_model import ActivoCotizacionHistorica
 from src.routers.dashboard_router import market_asset_history
 from src.services.cafci_service import (
+    FciHistoricalPoint,
     FciQuote,
     parse_cafci_workbook,
     sync_cafci_quotes,
@@ -23,6 +24,9 @@ def make_workbook(rows: list[tuple[object, ...]]) -> bytes:
     for row_number in range(1, 10):
         worksheet.cell(row=row_number, column=1, value=f"header {row_number}")
     worksheet.cell(row=9, column=7, value="19/11/2026")
+    worksheet.cell(row=9, column=10, value="30/10/2026")
+    worksheet.cell(row=9, column=11, value="30/12/2025")
+    worksheet.cell(row=9, column=12, value="31/10/2025")
     for row_number, row in enumerate(rows, start=10):
         for column_number, value in enumerate(row, start=1):
             worksheet.cell(row=row_number, column=column_number, value=value)
@@ -47,6 +51,9 @@ def cafci_row(
     row[5] = price
     row[6] = 123.4
     row[7] = change
+    row[9] = 110
+    row[10] = 100
+    row[11] = 90
     row[20] = code
     return tuple(row)
 
@@ -62,6 +69,16 @@ class CafciServiceTests(unittest.TestCase):
         self.assertEqual(quotes[0].quote_date, date(2026, 11, 20))
         self.assertEqual(quotes[0].previous_price, Decimal("123.400000"))
         self.assertEqual(quotes[0].previous_quote_date, date(2026, 11, 19))
+        self.assertEqual(
+            quotes[0].historical_points,
+            (
+                FciHistoricalPoint(date(2025, 10, 31), Decimal("90.000000")),
+                FciHistoricalPoint(date(2025, 12, 30), Decimal("100.000000")),
+                FciHistoricalPoint(date(2026, 10, 30), Decimal("110.000000")),
+                FciHistoricalPoint(date(2026, 11, 19), Decimal("123.400000")),
+                FciHistoricalPoint(date(2026, 11, 20), Decimal("123.456700")),
+            ),
+        )
 
     def test_parse_cafci_workbook_includes_ars_and_usd_funds(self):
         quotes = parse_cafci_workbook(make_workbook([
@@ -131,6 +148,38 @@ class CafciServiceTests(unittest.TestCase):
             self.assertEqual(
                 db.query(Activo).filter(Activo.ticker == "FCI-1234").one().precio_actual,
                 Decimal("125.000000"),
+            )
+        finally:
+            db.close()
+            engine.dispose()
+
+    def test_sync_saves_reference_points_and_current_quote_wins_duplicate_date(self):
+        engine = create_engine("sqlite:///:memory:")
+        Activo.__table__.create(engine)
+        ActivoCotizacionHistorica.__table__.create(engine)
+        db = sessionmaker(bind=engine)()
+        try:
+            quote = FciQuote(
+                ticker="FCI-1234",
+                name="Fondo de prueba",
+                currency="ARS",
+                price=Decimal("125.000000"),
+                change=Decimal("0.81"),
+                quote_date=date(2026, 11, 23),
+                historical_points=(
+                    FciHistoricalPoint(date(2025, 11, 20), Decimal("90.000000")),
+                    FciHistoricalPoint(date(2026, 11, 23), Decimal("124.000000")),
+                ),
+            )
+            sync_cafci_quotes(db, [quote])
+
+            history = market_asset_history("FCI-1234", db)
+            self.assertEqual(
+                history,
+                [
+                    {"date": "2025-11-20", "price": 90.0},
+                    {"date": "2026-11-23", "price": 125.0},
+                ],
             )
         finally:
             db.close()

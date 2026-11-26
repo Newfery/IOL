@@ -30,6 +30,12 @@ class CafciProviderError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class FciHistoricalPoint:
+    quote_date: date
+    price: Decimal
+
+
+@dataclass(frozen=True)
 class FciQuote:
     ticker: str
     name: str
@@ -39,6 +45,7 @@ class FciQuote:
     quote_date: date
     previous_price: Decimal | None = None
     previous_quote_date: date | None = None
+    historical_points: tuple[FciHistoricalPoint, ...] = ()
 
 
 def _parse_date(value: object) -> date:
@@ -72,6 +79,7 @@ def parse_cafci_workbook(content: bytes) -> list[FciQuote]:
     skipped_identity = 0
     skipped_quote = 0
     skipped_previous_quote = 0
+    skipped_historical_point = 0
     try:
         worksheet = workbook.active
         if worksheet is None:
@@ -80,6 +88,17 @@ def parse_cafci_workbook(content: bytes) -> list[FciQuote]:
             previous_quote_date = _parse_date(worksheet.cell(row=9, column=7).value)
         except (ValueError, TypeError):
             previous_quote_date = None
+        reference_dates: dict[int, date] = {}
+        for column in (10, 11, 12):
+            raw_date = worksheet.cell(row=9, column=column).value
+            if raw_date is None:
+                continue
+            try:
+                reference_dates[column] = _parse_date(raw_date)
+            except (ValueError, TypeError) as exc:
+                raise CafciProviderError(
+                    f"CAFCI devolvió una fecha de referencia inválida en la columna {column}"
+                ) from exc
 
         for row in worksheet.iter_rows(min_row=10, values_only=True):
             if len(row) <= 20 or row[20] is None:
@@ -116,6 +135,23 @@ def parse_cafci_workbook(content: bytes) -> list[FciQuote]:
                         previous_price = candidate_previous_price.quantize(Decimal("0.000001"))
                 except (InvalidOperation, ValueError, TypeError):
                     skipped_previous_quote += 1
+            historical_prices: dict[date, Decimal] = {}
+            if previous_price is not None and previous_quote_date is not None:
+                historical_prices[previous_quote_date] = previous_price
+            for column, reference_date in reference_dates.items():
+                raw_price = row[column - 1]
+                if raw_price is None or reference_date >= quote_date:
+                    continue
+                try:
+                    historical_price = _parse_number(raw_price)
+                    if historical_price <= 0:
+                        raise InvalidOperation
+                    historical_prices[reference_date] = historical_price.quantize(
+                        Decimal("0.000001")
+                    )
+                except (InvalidOperation, ValueError, TypeError):
+                    skipped_historical_point += 1
+            historical_prices[quote_date] = price.quantize(Decimal("0.000001"))
             ticker = f"FCI-{code}"
             if ticker in quotes:
                 raise CafciProviderError(f"El código CAFCI {code} está duplicado")
@@ -128,18 +164,24 @@ def parse_cafci_workbook(content: bytes) -> list[FciQuote]:
                 quote_date=quote_date,
                 previous_price=previous_price,
                 previous_quote_date=previous_quote_date if previous_price is not None else None,
+                historical_points=tuple(
+                    FciHistoricalPoint(quote_date=point_date, price=point_price)
+                    for point_date, point_price in sorted(historical_prices.items())
+                ),
             )
     finally:
         workbook.close()
 
     if not quotes:
         raise CafciProviderError("La planilla CAFCI no contiene cuotapartes válidas")
-    if skipped_identity or skipped_quote or skipped_previous_quote:
+    if skipped_identity or skipped_quote or skipped_previous_quote or skipped_historical_point:
         logger.warning(
-            "CAFCI: se omitieron %s filas por identificación, %s por cotización actual y %s por cotización previa",
+            "CAFCI: se omitieron %s filas por identificación, %s por cotización actual, "
+            "%s por cotización previa y %s puntos históricos",
             skipped_identity,
             skipped_quote,
             skipped_previous_quote,
+            skipped_historical_point,
         )
     return list(quotes.values())
 
@@ -199,9 +241,15 @@ def sync_cafci_quotes(db: Session, quotes: list[FciQuote]) -> tuple[int, int]:
         quotes_by_date: dict[date, list[tuple[Activo, Decimal]]] = defaultdict(list)
         for quote in quotes:
             asset = assets_by_ticker[quote.ticker]
+            history_by_date = {
+                point.quote_date: point.price
+                for point in quote.historical_points
+            }
             if quote.previous_price is not None and quote.previous_quote_date is not None:
-                quotes_by_date[quote.previous_quote_date].append((asset, quote.previous_price))
-            quotes_by_date[quote.quote_date].append((asset, quote.price))
+                history_by_date.setdefault(quote.previous_quote_date, quote.previous_price)
+            history_by_date[quote.quote_date] = quote.price
+            for quote_date, price in history_by_date.items():
+                quotes_by_date[quote_date].append((asset, price))
 
         for quote_date, daily_quotes in quotes_by_date.items():
             assets_for_date = [asset for asset, _ in daily_quotes]

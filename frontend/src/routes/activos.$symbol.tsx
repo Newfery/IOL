@@ -8,7 +8,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Button } from "@/components/ui/button";
 import { getAssets, getHistory, type Asset, type HistoryPoint } from "@/lib/api";
 import { categoryForAsset } from "@/lib/categories";
-import { HISTORY_RANGES, historyForRange } from "@/lib/asset-history";
+import { HISTORY_RANGES, historyForAsset } from "@/lib/asset-history";
 
 export const Route = createFileRoute("/activos/$symbol")({
   head: ({ params }) => {
@@ -129,7 +129,7 @@ function AssetDetail() {
     };
   }, [symbol]);
 
-  const points = historyForRange(history, days);
+  const points = historyForAsset(history, days, asset?.type === "FCI");
   const first = points[0];
   const last = points[points.length - 1];
   const change = first && last && first.price !== 0 ? (last.price / first.price - 1) * 100 : 0;
@@ -205,7 +205,7 @@ function AssetDetail() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {points.length > 0 && (
+                  {points.length > 1 && (
                     <div className="flex gap-1" role="group" aria-label="Tipo de gráfico">
                       <Button
                         size="sm"
@@ -245,7 +245,7 @@ function AssetDetail() {
               </div>
               {historyError ? (
                 <p role="alert" className="text-sm text-loss">{historyError}</p>
-              ) : points.length > 0 ? (
+              ) : points.length > 1 ? (
                 <>
                   <div className="h-80 w-full sm:h-96">
                     <ResponsiveContainer width="100%" height="100%">
@@ -309,7 +309,7 @@ function AssetDetail() {
                             name=""
                             stroke={lineColor}
                             strokeWidth={2}
-                            dot={points.length === 1 ? { r: 4 } : false}
+                            dot={false}
                             activeDot={(props: unknown) => {
                               const { cx, cy, payload } = props as { cx: number; cy: number; payload: HistoryPoint };
                               const fill = payload.price === baseline ? "var(--primary)"
@@ -328,9 +328,11 @@ function AssetDetail() {
                 </>
               ) : (
                 <p className="py-12 text-muted-foreground">
-                  {asset.type === "FCI"
-                    ? "El historial de CAFCI se acumula diariamente; todavía no hay cotizaciones suficientes para graficar."
-                    : "No hay cotizaciones históricas disponibles para este período."}
+                  {points.length === 1
+                    ? "Solo hay una cotización disponible; se necesitan al menos dos para mostrar la evolución."
+                    : asset.type === "FCI"
+                      ? "El historial de CAFCI se acumula diariamente; todavía no hay cotizaciones suficientes para graficar."
+                      : "No hay cotizaciones históricas disponibles para este período."}
                 </p>
               )}
             </section>

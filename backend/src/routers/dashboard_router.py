@@ -157,37 +157,31 @@ def market_asset_history(symbol: str, db: Session = Depends(get_db)):
             else:
                 return _merge_data912_history(data912_history, stored_history)
         if asset.tipo == "bono":
+            data912_history = []
             try:
                 data912_history = fetch_data912_bond_history(ticker)
             except Data912HistoryNotFoundError as exc:
-                if len(stored_history) >= MIN_BOND_HISTORY_POINTS:
-                    logger.warning(
-                        "Data912 no tiene historial para el bono %s; usando cotizaciones locales",
-                        ticker,
-                    )
-                    return stored_history
-                raise NotFoundError(
-                    f"No hay suficientes datos históricos de Data912 para el bono {ticker}"
-                ) from exc
-            except Data912ProviderError as exc:
-                if len(stored_history) >= MIN_BOND_HISTORY_POINTS:
-                    logger.warning(
-                        "No se pudo consultar Data912 para el bono %s; usando cotizaciones locales: %s",
-                        ticker,
-                        exc,
-                    )
-                    return stored_history
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"No se pudo consultar el historial de Data912 para {ticker}",
-                ) from exc
-
-            merged_history = _merge_data912_history(data912_history, stored_history)
-            if len(merged_history) < MIN_BOND_HISTORY_POINTS:
-                raise NotFoundError(
-                    f"No hay suficientes datos históricos de Data912 para el bono {ticker}"
+                logger.warning(
+                    "Data912 no tiene historial para el bono %s; se probarán otras fuentes: %s",
+                    ticker,
+                    exc,
                 )
-            return merged_history
+            except Data912ProviderError as exc:
+                logger.warning(
+                    "No se pudo consultar Data912 para el bono %s; se probarán otras fuentes: %s",
+                    ticker,
+                    exc,
+                )
+            else:
+                merged_history = _merge_data912_history(data912_history, stored_history)
+                if len(merged_history) >= MIN_BOND_HISTORY_POINTS:
+                    return merged_history
+                logger.warning(
+                    "Data912 devolvió solo %s cotizaciones para el bono %s; se probarán otras fuentes",
+                    len(merged_history),
+                    ticker,
+                )
+                stored_history = merged_history
 
     if ticker.endswith(".US"):
         market_symbol = ticker[:-3]
@@ -197,6 +191,11 @@ def market_asset_history(symbol: str, db: Session = Depends(get_db)):
         history = yf.Ticker(market_symbol).history(period="1y", interval="1d", auto_adjust=False)
     except Exception as exc:
         if stored_history:
+            logger.warning(
+                "No se pudo consultar Yahoo para %s; se usarán cotizaciones disponibles localmente: %s",
+                ticker,
+                exc,
+            )
             return stored_history
         raise HTTPException(status_code=502, detail="No se pudo consultar el historial") from exc
     if history.empty or "Close" not in history:

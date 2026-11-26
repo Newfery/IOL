@@ -10,7 +10,6 @@ from sqlalchemy.orm import sessionmaker
 from src.db.models.activos_model import Activo
 from src.db.models.activo_cotizacion_historica_model import ActivoCotizacionHistorica
 from src.routers.dashboard_router import market_asset_history
-from src.utils.errors import NotFoundError
 from src.services.data912_service import (
     DATA912_ENDPOINTS,
     Data912HistoricalQuote,
@@ -171,9 +170,25 @@ class Data912ServiceTests(unittest.TestCase):
                 ),
                 patch("src.routers.dashboard_router.yf.Ticker") as yahoo_ticker,
             ):
-                with self.assertRaisesRegex(NotFoundError, "No hay suficientes datos históricos"):
-                    market_asset_history("AL30", db)
-            yahoo_ticker.assert_not_called()
+                yahoo_ticker.return_value.history.return_value = pd.DataFrame(
+                    {"Close": [104.0, 105.0]},
+                    index=pd.to_datetime(["2026-11-25", "2026-11-26"]),
+                )
+                quotes = market_asset_history("AL30", db)
+            yahoo_ticker.assert_called_once_with("AL30.BA")
+            yahoo_ticker.return_value.history.assert_called_once_with(
+                period="1y",
+                interval="1d",
+                auto_adjust=False,
+            )
+            self.assertEqual(
+                [quote["date"][:10] for quote in quotes],
+                ["2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26"],
+            )
+            self.assertEqual(
+                [quote["price"] for quote in quotes],
+                [102.0, 103.25, 104.0, 105.0],
+            )
         finally:
             db.close()
             engine.dispose()
