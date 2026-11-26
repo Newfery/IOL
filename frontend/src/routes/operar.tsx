@@ -69,7 +69,7 @@ function Investments() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <main className="mx-auto max-w-7xl space-y-8 px-6 py-8">
+      <main className="mx-auto max-w-7xl space-y-8 px-4 py-6 sm:px-6 sm:py-8">
         <section>
           <h1 className="font-display text-2xl font-semibold">¿En qué querés invertir?</h1>
           <p className="mt-1 text-sm text-muted-foreground">Explorá las categorías o buscá un activo por nombre o símbolo.</p>

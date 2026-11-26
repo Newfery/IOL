@@ -185,7 +185,7 @@ function Grupos() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <main className="mx-auto max-w-7xl space-y-8 px-6 py-8">
+      <main className="mx-auto max-w-7xl space-y-8 px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-display text-3xl font-bold">Grupos de inversión</h1>
@@ -434,9 +434,9 @@ function Grupos() {
                   <h2 className="font-display text-lg font-semibold">Miembros y aportes</h2>
                   <ul className="mt-3 space-y-2 text-sm">
                     {group.members.map((m) => (
-                      <li key={m.name} className="flex justify-between">
-                        <span>{m.name}</span>
-                        <span className="font-mono">
+                      <li key={m.name} className="flex flex-col gap-1 sm:flex-row sm:justify-between">
+                        <span className="break-words">{m.name}</span>
+                        <span className="break-words font-mono sm:text-right">
                           {fmt(m.contributed)}
                           {m.contributedUsd > 0 && (
                             <span className="ml-1 text-xs text-muted-foreground">
@@ -450,7 +450,7 @@ function Grupos() {
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <select
                       value={currency}
                       onChange={(event) => {
@@ -465,8 +465,8 @@ function Grupos() {
                       <option value="USD">USD</option>
                     </select>
                     <input type="number" min={0.01} step={0.01} value={amount} onChange={(e) => setAmount(Number(e.target.value))}
-                      className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" />
-                    <button onClick={onContribute} className="rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground">Aportar</button>
+                      className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                    <button onClick={onContribute} className="min-h-10 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground">Aportar</button>
                   </div>
                   {currency === "USD" && (
                     <p className="mt-2 text-xs text-muted-foreground">
@@ -477,7 +477,7 @@ function Grupos() {
                   )}
                 </div>
 
-                <div className="rounded-xl border border-border bg-card p-5">
+                <div className="min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5">
                   <h2 className="font-display text-lg font-semibold">Comprar con el pozo</h2>
                   {assetsError && <p role="alert" className="mt-2 text-sm text-loss">{assetsError}</p>}
                   {asset ? (
@@ -572,9 +572,9 @@ function Grupos() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <div className="min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5">
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-2 font-display text-2xl font-semibold">{value}</p>
+      <p className="mt-2 break-words font-display text-xl font-semibold sm:text-2xl">{value}</p>
     </div>
   );
 }

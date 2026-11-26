@@ -103,7 +103,7 @@ function CategoryPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         <Link
           to="/operar"
           className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted"

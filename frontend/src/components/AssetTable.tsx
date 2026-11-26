@@ -37,7 +37,7 @@ export function AssetTable({
   favoriteActionsDisabled?: boolean;
 }) {
   return (
-    <table className="w-full text-sm">
+    <table className="w-full min-w-[640px] text-sm">
       <thead className="text-left text-xs uppercase text-muted-foreground">
         <tr>
           <th className="w-10 p-4" aria-label="Favorito" />

@@ -96,7 +96,7 @@ function MisInversiones() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl font-semibold">Mis inversiones</h1>
@@ -199,7 +199,7 @@ function MisInversiones() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[700px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-4 py-3">Activo</th>

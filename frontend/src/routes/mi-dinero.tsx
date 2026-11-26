@@ -89,7 +89,7 @@ function MiDinero() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <main className="mx-auto max-w-3xl space-y-6 px-6 py-8">
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         <h1 className="font-display text-2xl font-semibold">Mi dinero</h1>
         {error && <p role="alert" className="text-sm text-loss">{error}</p>}
 
@@ -103,10 +103,10 @@ function MiDinero() {
         </div>
 
         <section className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-start justify-between">
-            <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Tu disponible total</p>
-              <p className="mt-2 font-display text-4xl font-semibold">
+              <p className="mt-2 break-all font-display text-3xl font-semibold leading-tight sm:text-4xl">
                 {balance ? ocultar(fmt(moneda === "ARS" ? totalArs : totalUsd)) : "—"}
               </p>
               {moneda === "ARS" && balance && quotes.mep !== null && quotes.mep > 0 && (
@@ -131,12 +131,12 @@ function MiDinero() {
             {plazos.map((p) => {
               const m = moneda === "ARS" ? p.ars : p.usd;
               return (
-                <li key={p.label} className="flex items-center justify-between p-4">
+                <li key={p.label} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold">{p.label}</p>
                     <p className="text-xs text-muted-foreground">{p.detalle}</p>
                   </div>
-                  <p className="font-mono text-sm">{balance ? ocultar(fmt(m)) : "—"}</p>
+                  <p className="break-all font-mono text-sm sm:text-right">{balance ? ocultar(fmt(m)) : "—"}</p>
                 </li>
               );
             })}
@@ -154,15 +154,15 @@ function MiDinero() {
             </p>
             <ul className="mt-4 space-y-2">
               {tenenciasEnMoneda.map((holding) => (
-                <li key={`holding-${holding.symbol}`} className="flex items-center justify-between rounded-lg bg-muted px-4 py-3 text-sm">
-                  <span>{holding.symbol} · {holding.qty} unidades</span>
-                  <span className="font-mono">{ocultar(fmt(holding.qty * holding.avgPrice))}</span>
+                <li key={`holding-${holding.symbol}`} className="flex items-center justify-between gap-3 rounded-lg bg-muted px-4 py-3 text-sm">
+                  <span className="min-w-0 break-words">{holding.symbol} · {holding.qty} unidades</span>
+                  <span className="shrink-0 font-mono">{ocultar(fmt(holding.qty * holding.avgPrice))}</span>
                 </li>
               ))}
               {pendientesEnMoneda.map((p) => (
-                <li key={p.desc} className="flex items-center justify-between rounded-lg bg-muted px-4 py-3 text-sm">
-                  <span>{p.desc}</span>
-                  <span className="font-mono">{ocultar(fmt(monto(p.ars, p.usd)))}</span>
+                <li key={p.desc} className="flex items-center justify-between gap-3 rounded-lg bg-muted px-4 py-3 text-sm">
+                  <span className="min-w-0 break-words">{p.desc}</span>
+                  <span className="shrink-0 font-mono">{ocultar(fmt(monto(p.ars, p.usd)))}</span>
                 </li>
               ))}
               {comprometidoReady && tenenciasEnMoneda.length === 0 && pendientesEnMoneda.length === 0 && (

@@ -153,7 +153,7 @@ function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         <div>
           <h1 className="font-display text-2xl font-semibold">Hola, {user?.nombre}</h1>
           <p className="text-sm text-muted-foreground">Comitente N° {cuenta?.numero_comitente} · Perfil {user?.perfil_riesgo}</p>
@@ -163,7 +163,7 @@ function Home() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Total</p>
-              <p className="mt-2 font-display text-4xl font-semibold">{shownTotal}</p>
+              <p className="mt-2 break-all font-display text-3xl font-semibold leading-tight sm:text-4xl">{shownTotal}</p>
               <p className={`mt-1 text-sm ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
                 Rend. acumulado {totalPnl >= 0 ? "+" : ""}{ars(totalPnl)}
               </p>
@@ -259,7 +259,7 @@ function Home() {
                 <ul className="w-full divide-y divide-border text-sm" aria-label="Rendimiento de mis activos">
                   {rows.map((r) => {
                     return (
-                      <li key={r.symbol} className="flex items-center justify-between gap-4 py-5">
+                      <li key={r.symbol} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-5">
                         <span className="flex min-w-0 items-center gap-3">
                           <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: getAssetColor(colorBySymbol, r.symbol) }} />
                           <span className="min-w-0">
@@ -273,7 +273,7 @@ function Home() {
                             <span className="mt-1 block break-words text-xs text-muted-foreground">{r.name}</span>
                           </span>
                         </span>
-                        <span className={`shrink-0 whitespace-nowrap text-right font-mono text-base font-semibold ${r.pnl >= 0 ? "text-gain" : "text-loss"}`}>
+                        <span className={`self-end text-right font-mono text-sm font-semibold sm:shrink-0 sm:whitespace-nowrap sm:text-base ${r.pnl >= 0 ? "text-gain" : "text-loss"}`}>
                           {signedMoney(r.pnl, r.currency)} ({r.pnlPct >= 0 ? "+" : ""}{r.pnlPct.toFixed(1)}%)
                         </span>
                       </li>
