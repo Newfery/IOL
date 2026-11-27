@@ -109,7 +109,22 @@ en el catálogo. También se puede ejecutar manualmente desde `backend/`:
 Los FCI se guardan con ticker `FCI-<código CAFCI>` y precisión de seis decimales
 para conservar el valor de cuotaparte. Cada cotización se guarda en el
 historial por fecha; si la misma fecha se sincroniza otra vez, se actualiza ese
-punto en lugar de duplicarlo. La migración
+punto en lugar de duplicarlo. La planilla diaria también publica variaciones
+porcentuales a fechas de referencia; esos porcentajes no se guardan como
+precios históricos. Para cargar hasta un año de datos semanales, ejecutar una
+vez desde `backend/`:
+
+```powershell
+.\venv\Scripts\python.exe -m src.services.cafci_history_backfill
+```
+
+El comparador oficial de CAFCI publica rendimientos semanales, no valores NAV
+diarios. El proceso reconstruye los precios semanales anclándolos a la última
+cuotaparte oficial disponible, conserva puntos diarios compatibles y corrige
+valores evidentemente inconsistentes. Se puede volver a ejecutar sin duplicar
+fechas. Si se interrumpe, se puede reanudar desde el último lote informado en
+el log, por ejemplo `--start-group 350`. Clases sin equivalencia o sin fecha
+de cotización coincidente en el comparador se omiten, no se inventan datos. La migración
 [`008_cafci_fci.sql`](src/db/migrations/008_cafci_fci.sql) habilita el tipo FCI,
 amplía la precisión del precio y agrega la fecha de cotización. La migración
 [`009_fci_price_history.sql`](src/db/migrations/009_fci_price_history.sql)

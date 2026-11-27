@@ -13,6 +13,7 @@ from src.routers.dashboard_router import market_asset_history
 from src.services.cafci_service import (
     FciHistoricalPoint,
     FciQuote,
+    FciReferenceValue,
     parse_cafci_workbook,
     sync_cafci_quotes,
 )
@@ -72,11 +73,16 @@ class CafciServiceTests(unittest.TestCase):
         self.assertEqual(
             quotes[0].historical_points,
             (
-                FciHistoricalPoint(date(2025, 10, 31), Decimal("90.000000")),
-                FciHistoricalPoint(date(2025, 12, 30), Decimal("100.000000")),
-                FciHistoricalPoint(date(2026, 10, 30), Decimal("110.000000")),
                 FciHistoricalPoint(date(2026, 11, 19), Decimal("123.400000")),
                 FciHistoricalPoint(date(2026, 11, 20), Decimal("123.456700")),
+            ),
+        )
+        self.assertEqual(
+            quotes[0].legacy_reference_values,
+            (
+                FciReferenceValue(date(2025, 10, 31), Decimal("90.000000")),
+                FciReferenceValue(date(2025, 12, 30), Decimal("100.000000")),
+                FciReferenceValue(date(2026, 10, 30), Decimal("110.000000")),
             ),
         )
 
@@ -153,7 +159,7 @@ class CafciServiceTests(unittest.TestCase):
             db.close()
             engine.dispose()
 
-    def test_sync_saves_reference_points_and_current_quote_wins_duplicate_date(self):
+    def test_sync_saves_valid_history_points_and_current_quote_wins_duplicate_date(self):
         engine = create_engine("sqlite:///:memory:")
         Activo.__table__.create(engine)
         ActivoCotizacionHistorica.__table__.create(engine)
@@ -179,6 +185,70 @@ class CafciServiceTests(unittest.TestCase):
                 [
                     {"date": "2025-11-20", "price": 90.0},
                     {"date": "2026-11-23", "price": 125.0},
+                ],
+            )
+        finally:
+            db.close()
+            engine.dispose()
+
+    def test_sync_removes_matching_legacy_percentage_values(self):
+        engine = create_engine("sqlite:///:memory:")
+        Activo.__table__.create(engine)
+        ActivoCotizacionHistorica.__table__.create(engine)
+        db = sessionmaker(bind=engine)()
+        try:
+            asset = Activo(
+                ticker="FCI-1234",
+                nombre="Fondo de prueba",
+                tipo="fci",
+                moneda="ARS",
+                precio_actual=Decimal("123.456700"),
+                fecha_cotizacion=date(2026, 11, 20),
+                variacion_porcentual=Decimal("0.25"),
+                nivel_riesgo=3,
+                activo=True,
+            )
+            db.add(asset)
+            db.flush()
+            db.add_all([
+                ActivoCotizacionHistorica(
+                    activo_id=asset.id,
+                    fecha=date(2026, 10, 30),
+                    precio=Decimal("0.282000"),
+                ),
+                ActivoCotizacionHistorica(
+                    activo_id=asset.id,
+                    fecha=date(2026, 10, 29),
+                    precio=Decimal("110.000000"),
+                ),
+            ])
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+        try:
+            quote = FciQuote(
+                ticker="FCI-1234",
+                name="Fondo de prueba",
+                currency="ARS",
+                price=Decimal("123.456700"),
+                change=Decimal("0.25"),
+                quote_date=date(2026, 11, 20),
+                legacy_reference_values=(
+                    FciReferenceValue(date(2026, 10, 30), Decimal("0.282000")),
+                ),
+            )
+            sync_cafci_quotes(db, [quote])
+
+            remaining = db.query(ActivoCotizacionHistorica).filter(
+                ActivoCotizacionHistorica.activo_id == asset.id,
+            ).all()
+            self.assertEqual(
+                sorted((record.fecha, record.precio) for record in remaining),
+                [
+                    (date(2026, 10, 29), Decimal("110.000000")),
+                    (date(2026, 11, 20), Decimal("123.456700")),
                 ],
             )
         finally:

@@ -36,6 +36,12 @@ class FciHistoricalPoint:
 
 
 @dataclass(frozen=True)
+class FciReferenceValue:
+    quote_date: date
+    value: Decimal
+
+
+@dataclass(frozen=True)
 class FciQuote:
     ticker: str
     name: str
@@ -46,6 +52,7 @@ class FciQuote:
     previous_price: Decimal | None = None
     previous_quote_date: date | None = None
     historical_points: tuple[FciHistoricalPoint, ...] = ()
+    legacy_reference_values: tuple[FciReferenceValue, ...] = ()
 
 
 def _parse_date(value: object) -> date:
@@ -79,7 +86,7 @@ def parse_cafci_workbook(content: bytes) -> list[FciQuote]:
     skipped_identity = 0
     skipped_quote = 0
     skipped_previous_quote = 0
-    skipped_historical_point = 0
+    skipped_reference_value = 0
     try:
         worksheet = workbook.active
         if worksheet is None:
@@ -136,21 +143,22 @@ def parse_cafci_workbook(content: bytes) -> list[FciQuote]:
                 except (InvalidOperation, ValueError, TypeError):
                     skipped_previous_quote += 1
             historical_prices: dict[date, Decimal] = {}
+            legacy_reference_values: dict[date, Decimal] = {}
             if previous_price is not None and previous_quote_date is not None:
                 historical_prices[previous_quote_date] = previous_price
             for column, reference_date in reference_dates.items():
-                raw_price = row[column - 1]
-                if raw_price is None or reference_date >= quote_date:
+                raw_value = row[column - 1]
+                if raw_value is None or reference_date >= quote_date:
                     continue
                 try:
-                    historical_price = _parse_number(raw_price)
-                    if historical_price <= 0:
-                        raise InvalidOperation
-                    historical_prices[reference_date] = historical_price.quantize(
+                    reference_value = _parse_number(raw_value)
+                except (InvalidOperation, ValueError, TypeError):
+                    skipped_reference_value += 1
+                    continue
+                if reference_value > 0:
+                    legacy_reference_values[reference_date] = reference_value.quantize(
                         Decimal("0.000001")
                     )
-                except (InvalidOperation, ValueError, TypeError):
-                    skipped_historical_point += 1
             historical_prices[quote_date] = price.quantize(Decimal("0.000001"))
             ticker = f"FCI-{code}"
             if ticker in quotes:
@@ -168,20 +176,24 @@ def parse_cafci_workbook(content: bytes) -> list[FciQuote]:
                     FciHistoricalPoint(quote_date=point_date, price=point_price)
                     for point_date, point_price in sorted(historical_prices.items())
                 ),
+                legacy_reference_values=tuple(
+                    FciReferenceValue(quote_date=point_date, value=point_value)
+                    for point_date, point_value in sorted(legacy_reference_values.items())
+                ),
             )
     finally:
         workbook.close()
 
     if not quotes:
         raise CafciProviderError("La planilla CAFCI no contiene cuotapartes válidas")
-    if skipped_identity or skipped_quote or skipped_previous_quote or skipped_historical_point:
+    if skipped_identity or skipped_quote or skipped_previous_quote or skipped_reference_value:
         logger.warning(
             "CAFCI: se omitieron %s filas por identificación, %s por cotización actual, "
-            "%s por cotización previa y %s puntos históricos",
+            "%s por cotización previa y %s valores de referencia",
             skipped_identity,
             skipped_quote,
             skipped_previous_quote,
-            skipped_historical_point,
+            skipped_reference_value,
         )
     return list(quotes.values())
 
@@ -238,9 +250,12 @@ def sync_cafci_quotes(db: Session, quotes: list[FciQuote]) -> tuple[int, int]:
                 updated += 1
 
         db.flush()
+        legacy_values_by_date: dict[date, dict[int, Decimal]] = defaultdict(dict)
         quotes_by_date: dict[date, list[tuple[Activo, Decimal]]] = defaultdict(list)
         for quote in quotes:
             asset = assets_by_ticker[quote.ticker]
+            for reference_value in quote.legacy_reference_values:
+                legacy_values_by_date[reference_value.quote_date][asset.id] = reference_value.value
             history_by_date = {
                 point.quote_date: point.price
                 for point in quote.historical_points
@@ -250,6 +265,18 @@ def sync_cafci_quotes(db: Session, quotes: list[FciQuote]) -> tuple[int, int]:
             history_by_date[quote.quote_date] = quote.price
             for quote_date, price in history_by_date.items():
                 quotes_by_date[quote_date].append((asset, price))
+
+        for reference_date, values_by_asset in legacy_values_by_date.items():
+            asset_ids = list(values_by_asset)
+            for offset in range(0, len(asset_ids), 500):
+                batch_ids = asset_ids[offset:offset + 500]
+                records = db.query(ActivoCotizacionHistorica).filter(
+                    ActivoCotizacionHistorica.activo_id.in_(batch_ids),
+                    ActivoCotizacionHistorica.fecha == reference_date,
+                ).all()
+                for record in records:
+                    if Decimal(record.precio) == values_by_asset[record.activo_id]:
+                        db.delete(record)
 
         for quote_date, daily_quotes in quotes_by_date.items():
             assets_for_date = [asset for asset, _ in daily_quotes]
