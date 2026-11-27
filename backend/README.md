@@ -76,6 +76,17 @@ selección amplia, no la totalidad de sus símbolos. Las acciones y ETFs de EE. 
 se guardan en USD con sufijo `.US` para distinguirlos de CEDEARs con el mismo
 ticker.
 
+### Activos adicionales de Finnhub
+
+Finnhub descubre acciones y ETFs de EE. UU. en NYSE, NASDAQ y ARCA, y solo
+incorpora símbolos con cotización disponible y moneda USD. Configurá
+`FINNHUB_API_KEY` en `backend/.env`; `FINNHUB_MAX_ASSETS` determina el tamaño de
+cada lote (50 por defecto). La API procesa lotes consecutivos en segundo plano,
+con una pausa entre consultas para respetar la cuota gratuita, y omite los
+tickers ya registrados. Al no encontrar más símbolos con cotización disponible,
+vuelve a intentarlo cada seis horas. El progreso queda en la tabla `activo`, así
+que continúa desde ahí después de reiniciar el backend.
+
 ### Historial gráfico de CEDEARs
 
 El endpoint `GET /api/market/assets/{ticker}/history` consulta el historial

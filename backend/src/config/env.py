@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     PORT: int = 8000
     JWT_SECRET: str
     PASSWORD_FINGERPRINT_SECRET: str | None = None
+    FINNHUB_API_KEY: str | None = None
+    FINNHUB_MAX_ASSETS: int = 50
     CORS_ORIGINS: str = (
         "http://localhost:5173,http://127.0.0.1:5173,"
         "http://localhost:8080,http://127.0.0.1:8080"

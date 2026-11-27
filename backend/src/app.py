@@ -27,11 +27,14 @@ from src.routers import (
 from src.db.seeders.yfinance_assets import sync_assets as sync_yfinance_assets
 from src.services.cafci_service import CafciProviderError, sync_cafci_assets
 from src.services.data912_service import Data912ProviderError, sync_data912_assets
+from src.services.finnhub_service import FinnhubProviderError, sync_finnhub_assets
 from src.utils.errors import AppError
 
 logger = logging.getLogger(__name__)
 CAFCI_REFRESH_SECONDS = 6 * 60 * 60
 DATA912_REFRESH_SECONDS = 2 * 60 * 60
+FINNHUB_REFRESH_SECONDS = 6 * 60 * 60
+FINNHUB_RETRY_SECONDS = 60
 
 
 async def _refresh_cafci_periodically() -> None:
@@ -58,6 +61,28 @@ async def _refresh_data912_periodically(startup_task: asyncio.Task[None]) -> Non
         except (Data912ProviderError, SQLAlchemyError):
             logger.exception("Falló la actualización de precios desde Data912")
         await asyncio.sleep(DATA912_REFRESH_SECONDS)
+
+
+async def _refresh_finnhub_periodically() -> None:
+    while True:
+        try:
+            inserted, updated = await asyncio.to_thread(sync_finnhub_assets)
+            logger.info(
+                "Sincronización Finnhub: %s nuevos, %s actualizados",
+                inserted,
+                updated,
+            )
+        except (FinnhubProviderError, SQLAlchemyError):
+            logger.exception("Falló la actualización de activos desde Finnhub")
+            await asyncio.sleep(FINNHUB_RETRY_SECONDS)
+            continue
+        if inserted == 0:
+            logger.info(
+                "Finnhub no encontró activos nuevos con cotización disponible; "
+                "se volverá a intentar en %s horas",
+                FINNHUB_REFRESH_SECONDS // 3600,
+            )
+            await asyncio.sleep(FINNHUB_REFRESH_SECONDS)
 
 
 async def _sync_yahoo_assets_on_startup() -> None:
@@ -92,10 +117,11 @@ async def lifespan(_: FastAPI):
     yahoo_task = asyncio.create_task(_sync_yahoo_assets_on_startup())
     yahoo_task.add_done_callback(_log_yahoo_sync_failure)
     data912_task = asyncio.create_task(_refresh_data912_periodically(yahoo_task))
+    finnhub_task = asyncio.create_task(_refresh_finnhub_periodically())
     try:
         yield
     finally:
-        tasks = (cafci_task, yahoo_task, data912_task)
+        tasks = (cafci_task, yahoo_task, data912_task, finnhub_task)
         for task in tasks:
             if not task.done():
                 task.cancel()
