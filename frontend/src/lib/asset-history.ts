@@ -19,11 +19,3 @@ export function historyForRange(history: HistoryPoint[], days: number): HistoryP
 
   return history.filter((point) => point.date.slice(0, 10) >= cutoffDay);
 }
-
-export function historyForAsset(
-  history: HistoryPoint[],
-  days: number,
-  isFci: boolean,
-): HistoryPoint[] {
-  return isFci ? history : historyForRange(history, days);
-}

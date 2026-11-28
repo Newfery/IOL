@@ -59,14 +59,6 @@ export const CATEGORIES: Category[] = [
     icon: Landmark,
     matches: (asset) => asset.type === "Bono",
   },
-  {
-    slug: "fci",
-    type: "FCI",
-    label: "FCI",
-    desc: "Fondos comunes de inversión administrados por profesionales.",
-    icon: PieChart,
-    matches: (asset) => asset.type === "FCI",
-  },
 ];
 
 export function findCategory(slug: string | undefined): Category | undefined {

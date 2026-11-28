@@ -6,7 +6,7 @@ const fmt = (value: number, asset: Asset) =>
   value.toLocaleString("es-AR", {
     style: "currency",
     currency: asset.currency,
-    maximumFractionDigits: asset.type === "FCI" ? 6 : 2,
+    maximumFractionDigits: 2,
   });
 
 export function OrderDialog({ asset, onClose }: { asset: Asset; onClose: () => void }) {

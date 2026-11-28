@@ -44,7 +44,7 @@
         activo BOOLEAN DEFAULT TRUE NOT NULL,
         
         -- HU2: Tipos y monedas válidas
-        CONSTRAINT chk_activo_tipo CHECK (tipo IN ('accion', 'cedear', 'bono', 'etf', 'fci')),
+        CONSTRAINT chk_activo_tipo CHECK (tipo IN ('accion', 'cedear', 'bono', 'etf')),
         CONSTRAINT chk_activo_moneda CHECK (moneda IN ('ARS', 'USD')),
         -- HU2: Precio mayor a 0 y riesgo de 1 a 5
         CONSTRAINT chk_precio_actual CHECK (precio_actual > 0),

@@ -106,7 +106,6 @@ def market_assets(db: Session = Depends(get_db)):
         "cedear": "CEDEAR",
         "bono": "Bono",
         "etf": "ETF",
-        "fci": "FCI",
     }
     return [
         {
@@ -115,9 +114,8 @@ def market_assets(db: Session = Depends(get_db)):
             "name": asset.nombre,
             "price": float(asset.precio_actual),
             "change": float(asset.variacion_porcentual),
-            "type": type_names.get(asset.tipo, "FCI"),
+            "type": type_names[asset.tipo],
             "currency": asset.moneda,
-            "quoteDate": asset.fecha_cotizacion.isoformat() if asset.fecha_cotizacion else None,
         }
         for asset in assets
     ]
@@ -137,8 +135,6 @@ def market_asset_history(symbol: str, db: Session = Depends(get_db)):
             {"date": quote.fecha.isoformat(), "price": float(quote.precio)}
             for quote in history
         ]
-        if asset.tipo == "fci":
-            return stored_history
         if asset.tipo == "cedear":
             try:
                 data912_history = fetch_data912_cedear_history(ticker)

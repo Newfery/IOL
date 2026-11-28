@@ -94,42 +94,6 @@ local de CEDEARs en Data912 y lo combina con las cotizaciones guardadas. Si
 Data912 no tiene datos para un ticker o no responde, usa el historial diario de
 Yahoo Finance como alternativa.
 
-### Cuotapartes de FCI
-
-Los fondos y sus valores de cuotaparte se importan desde la planilla diaria
-oficial de CAFCI. Al iniciar la API se hace una sincronización y luego se vuelve
-a consultar cada seis horas; CAFCI publica datos diarios, por lo que esto no
-implica una cotización intradiaria. La fecha informada por la fuente se muestra
-en el catálogo. También se puede ejecutar manualmente desde `backend/`:
-
-```powershell
-.\venv\Scripts\python.exe -m src.services.cafci_service
-```
-
-Los FCI se guardan con ticker `FCI-<código CAFCI>` y precisión de seis decimales
-para conservar el valor de cuotaparte. Cada cotización se guarda en el
-historial por fecha; si la misma fecha se sincroniza otra vez, se actualiza ese
-punto en lugar de duplicarlo. La planilla diaria también publica variaciones
-porcentuales a fechas de referencia; esos porcentajes no se guardan como
-precios históricos. Para cargar hasta un año de datos semanales, ejecutar una
-vez desde `backend/`:
-
-```powershell
-.\venv\Scripts\python.exe -m src.services.cafci_history_backfill
-```
-
-El comparador oficial de CAFCI publica rendimientos semanales, no valores NAV
-diarios. El proceso reconstruye los precios semanales anclándolos a la última
-cuotaparte oficial disponible, conserva puntos diarios compatibles y corrige
-valores evidentemente inconsistentes. Se puede volver a ejecutar sin duplicar
-fechas. Si se interrumpe, se puede reanudar desde el último lote informado en
-el log, por ejemplo `--start-group 350`. Clases sin equivalencia o sin fecha
-de cotización coincidente en el comparador se omiten, no se inventan datos. La migración
-[`008_cafci_fci.sql`](src/db/migrations/008_cafci_fci.sql) habilita el tipo FCI,
-amplía la precisión del precio y agrega la fecha de cotización. La migración
-[`009_fci_price_history.sql`](src/db/migrations/009_fci_price_history.sql)
-crea el historial e inicializa un punto con la última cotización disponible.
-
 La integración de bonos requiere acceso autorizado a la API de renta fija de
 BYMA y su documentación técnica. No se usa un proveedor no oficial ni se
 inventan endpoints; hasta contar con ese acceso, los bonos existentes no se
@@ -169,9 +133,13 @@ Para instalaciones existentes, aplicar en orden las migraciones
 [`004_users.sql`](src/db/migrations/004_users.sql) y
 [`005_us_assets_catalog.sql`](src/db/migrations/005_us_assets_catalog.sql),
 [`006_aporte_grupo_moneda.sql`](src/db/migrations/006_aporte_grupo_moneda.sql) y
-[`007_favoritos.sql`](src/db/migrations/007_favoritos.sql) y
-[`008_cafci_fci.sql`](src/db/migrations/008_cafci_fci.sql) y
-[`009_fci_price_history.sql`](src/db/migrations/009_fci_price_history.sql).
+[`007_favoritos.sql`](src/db/migrations/007_favoritos.sql),
+[`008_cafci_fci.sql`](src/db/migrations/008_cafci_fci.sql),
+[`009_fci_price_history.sql`](src/db/migrations/009_fci_price_history.sql) y
+[`010_remove_fci_assets.sql`](src/db/migrations/010_remove_fci_assets.sql).
+Las migraciones 008 y 009 se conservan como historial; la 010 elimina los FCI y
+sus operaciones y devuelve a cada cuenta el neto de sus operaciones FCI
+ejecutadas.
 La migración conserva los inversores actuales sin asignarles contraseñas.
 Configurar `PASSWORD_FINGERPRINT_SECRET` con un secreto estable y distinto de
 `JWT_SECRET`; si se omite, se deriva del `JWT_SECRET` configurado.

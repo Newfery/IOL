@@ -7,15 +7,11 @@ const fmt = (asset: Asset) =>
   asset.price.toLocaleString("es-AR", {
     style: "currency",
     currency: asset.currency,
-    maximumFractionDigits: asset.type === "FCI" ? 6 : 2,
+    maximumFractionDigits: 2,
   });
-const quoteDateLabel = (value: string) => {
-  const [year, month, day] = value.slice(0, 10).split("-");
-  return `${day}/${month}/${year}`;
-};
 const tradingViewChartUrl = (asset: Asset) => {
   const symbol = asset.symbol.replace(/\.US$/i, "");
-  const tradingViewSymbol = asset.currency === "ARS" && asset.type !== "FCI"
+  const tradingViewSymbol = asset.currency === "ARS"
     ? `BCBA:${symbol}`
     : symbol;
   return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tradingViewSymbol)}`;
@@ -80,11 +76,6 @@ export function AssetTable({
                 {asset.symbol}
               </Link>
               <div className="text-xs text-muted-foreground">{asset.name}</div>
-              {asset.type === "FCI" && asset.quoteDate && (
-                <div className="text-xs text-muted-foreground">
-                  Cuotaparte al {quoteDateLabel(asset.quoteDate)}
-                </div>
-              )}
             </td>
             <td className="p-4 text-muted-foreground">{asset.type}</td>
             <td className="p-4 text-right font-mono">{fmt(asset)}</td>

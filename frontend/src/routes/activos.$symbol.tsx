@@ -8,7 +8,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Button } from "@/components/ui/button";
 import { getAssets, getHistory, type Asset, type HistoryPoint } from "@/lib/api";
 import { categoryForAsset } from "@/lib/categories";
-import { HISTORY_RANGES, historyForAsset } from "@/lib/asset-history";
+import { HISTORY_RANGES, historyForRange } from "@/lib/asset-history";
 
 export const Route = createFileRoute("/activos/$symbol")({
   head: ({ params }) => {
@@ -36,7 +36,7 @@ const fmt = (value: number, asset: Asset) =>
   value.toLocaleString("es-AR", {
     style: "currency",
     currency: asset.currency,
-    maximumFractionDigits: asset.type === "FCI" ? 6 : 2,
+    maximumFractionDigits: 2,
   });
 const dateLabel = (value: string) =>
   new Date(`${value.slice(0, 10)}T00:00:00Z`).toLocaleDateString("es-AR", {
@@ -129,7 +129,7 @@ function AssetDetail() {
     };
   }, [symbol]);
 
-  const points = historyForAsset(history, days, asset?.type === "FCI");
+  const points = historyForRange(history, days);
   const first = points[0];
   const last = points[points.length - 1];
   const change = first && last && first.price !== 0 ? (last.price / first.price - 1) * 100 : 0;
@@ -176,15 +176,13 @@ function AssetDetail() {
             <section className="flex flex-wrap items-start justify-between gap-6 border-b border-border pb-8">
               <div>
                 <p className="mb-2 text-sm text-muted-foreground">
-                  {asset.type} · {asset.currency} · {asset.type === "FCI"
-                    ? `Cuotaparte al ${asset.quoteDate ? dateLabel(asset.quoteDate) : "último dato disponible"}`
-                    : "Cotización del mercado"}
+                  {asset.type} · {asset.currency} · Cotización del mercado
                 </p>
                 <h1 className="font-display text-3xl font-semibold">{asset.symbol}</h1>
                 <p className="mt-1 text-lg text-muted-foreground">{asset.name}</p>
               </div>
               <div className="space-y-3 sm:text-right">
-                <p className="text-sm text-muted-foreground">{asset.type === "FCI" ? "Valor de cuotaparte" : "Precio actual"}</p>
+                <p className="text-sm text-muted-foreground">Precio actual</p>
                 <p className="font-mono text-3xl font-semibold">{fmt(asset.price, asset)}</p>
                 <p className={`flex items-center gap-1 text-sm sm:justify-end ${asset.change >= 0 ? "text-gain" : "text-loss"}`}>
                   {asset.change >= 0 ? <ArrowUpRight className="size-4" /> : <ArrowDownRight className="size-4" />}
@@ -199,9 +197,7 @@ function AssetDetail() {
                 <div>
                   <h2 className="font-display text-xl font-semibold">Evolución del precio</h2>
                   <p className={`mt-1 font-mono text-sm ${change >= 0 ? "text-gain" : "text-loss"}`}>
-                    {asset.type === "FCI"
-                      ? "Cotización diaria"
-                      : `${change >= 0 ? "+" : ""}${change.toFixed(2)}% en el período`}
+                    {`${change >= 0 ? "+" : ""}${change.toFixed(2)}% en el período`}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -209,16 +205,16 @@ function AssetDetail() {
                     <div className="flex gap-1" role="group" aria-label="Tipo de gráfico">
                       <Button
                         size="sm"
-                        variant={showCandles ? "ghost" : "default"}
-                        aria-pressed={!showCandles}
+                        variant={chartType === "line" ? "default" : "ghost"}
+                        aria-pressed={chartType === "line"}
                         onClick={() => setChartType("line")}
                       >
                         Línea
                       </Button>
                       <Button
                         size="sm"
-                        variant={showCandles ? "default" : "ghost"}
-                        aria-pressed={showCandles}
+                        variant={chartType === "candles" ? "default" : "ghost"}
+                        aria-pressed={chartType === "candles"}
                         disabled={!hasCandles}
                         onClick={() => setChartType("candles")}
                       >
@@ -226,21 +222,19 @@ function AssetDetail() {
                       </Button>
                     </div>
                   )}
-                  {asset.type !== "FCI" && (
-                    <div className="flex flex-wrap gap-1" role="group" aria-label="Rango de tiempo">
-                      {HISTORY_RANGES.map((range) => (
-                        <Button
-                          key={range.days}
-                          size="sm"
-                          variant={days === range.days ? "default" : "ghost"}
-                          aria-pressed={days === range.days}
-                          onClick={() => setDays(range.days)}
-                        >
-                          {range.label}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
+                  <div className="flex flex-wrap gap-1" role="group" aria-label="Rango de tiempo">
+                    {HISTORY_RANGES.map((range) => (
+                      <Button
+                        key={range.days}
+                        size="sm"
+                        variant={days === range.days ? "default" : "ghost"}
+                        aria-pressed={days === range.days}
+                        onClick={() => setDays(range.days)}
+                      >
+                        {range.label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
               {historyError ? (
@@ -330,9 +324,7 @@ function AssetDetail() {
                 <p className="py-12 text-muted-foreground">
                   {points.length === 1
                     ? "Solo hay una cotización disponible; se necesitan al menos dos para mostrar la evolución."
-                    : asset.type === "FCI"
-                      ? "El historial de CAFCI se acumula diariamente; todavía no hay cotizaciones suficientes para graficar."
-                      : "No hay cotizaciones históricas disponibles para este período."}
+                    : "No hay cotizaciones históricas disponibles para este período."}
                 </p>
               )}
             </section>
@@ -345,10 +337,7 @@ function AssetDetail() {
                   ["Nombre", asset.name],
                   ["Tipo", asset.type],
                   ["Moneda", asset.currency],
-                  [asset.type === "FCI" ? "Valor de cuotaparte" : "Precio actual", fmt(asset.price, asset)],
-                  ...(asset.type === "FCI" && asset.quoteDate
-                    ? [["Fecha de cotización", dateLabel(asset.quoteDate)]]
-                    : []),
+                  ["Precio actual", fmt(asset.price, asset)],
                   ["Variación diaria", `${asset.change > 0 ? "+" : ""}${asset.change.toFixed(2)}%`],
                   ["Mínimo del período", prices.length ? fmt(Math.min(...prices), asset) : "—"],
                   ["Máximo del período", prices.length ? fmt(Math.max(...prices), asset) : "—"],

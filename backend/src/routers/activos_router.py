@@ -38,7 +38,7 @@ def create_activo(payload: CreateActivoSchema, db: Session = Depends(get_db)):
 
 @router.get("/", response_model=list[ActivoResponseDTO])
 def get_activos(
-    tipo: Literal["accion", "cedear", "bono", "etf", "fci"] | None = None,
+    tipo: Literal["accion", "cedear", "bono", "etf"] | None = None,
     moneda: Literal["ARS", "USD"] | None = None,
     db: Session = Depends(get_db)
 ):

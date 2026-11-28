@@ -6,7 +6,7 @@ from typing import Literal
 class CreateActivoSchema(BaseModel):  # POST
     ticker: str = Field(min_length=1, max_length=20)
     nombre: str = Field(min_length=1, max_length=100)
-    tipo: Literal["accion", "cedear", "bono", "etf", "fci"]
+    tipo: Literal["accion", "cedear", "bono", "etf"]
     moneda: Literal["ARS", "USD"]
     precio_actual: Decimal = Field(gt=0, max_digits=15, decimal_places=6)
     nivel_riesgo: int = Field(ge=1, le=5)
@@ -16,7 +16,7 @@ class CreateActivoSchema(BaseModel):  # POST
 class UpdateActivoSchema(BaseModel):  # PUT/PATCH
     ticker: str | None = Field(default=None, min_length=1, max_length=20)
     nombre: str | None = Field(default=None, min_length=1, max_length=100)
-    tipo: Literal["accion", "cedear", "bono", "etf", "fci"] | None = None
+    tipo: Literal["accion", "cedear", "bono", "etf"] | None = None
     moneda: Literal["ARS", "USD"] | None = None
     precio_actual: Decimal | None = Field(default=None, gt=0, max_digits=15, decimal_places=6)
     nivel_riesgo: int | None = Field(default=None, ge=1, le=5)

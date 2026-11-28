@@ -27,7 +27,7 @@ class Activo(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "tipo IN ('accion', 'cedear', 'bono', 'etf', 'fci')",
+            "tipo IN ('accion', 'cedear', 'bono', 'etf')",
             name="chk_activo_tipo",
         ),
         CheckConstraint("moneda IN ('ARS', 'USD')"),

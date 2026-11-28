@@ -6,7 +6,7 @@ from typing import Literal
 class CreateActivoDTO(BaseModel):
     ticker: str
     nombre: str
-    tipo: Literal["accion", "cedear", "bono", "etf", "fci"]
+    tipo: Literal["accion", "cedear", "bono", "etf"]
     moneda: Literal["ARS", "USD"]
     precio_actual: Decimal = Field(gt=0)
     nivel_riesgo: int = Field(ge=1, le=5)
@@ -16,7 +16,7 @@ class CreateActivoDTO(BaseModel):
 class UpdateActivoDTO(BaseModel):
     ticker: str | None = None
     nombre: str | None = None
-    tipo: Literal["accion", "cedear", "bono", "etf", "fci"] | None = None
+    tipo: Literal["accion", "cedear", "bono", "etf"] | None = None
     moneda: Literal["ARS", "USD"] | None = None
     precio_actual: Decimal | None = Field(default=None, gt=0)
     nivel_riesgo: int | None = Field(default=None, ge=1, le=5)
